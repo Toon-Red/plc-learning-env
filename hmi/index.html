@@ -1,0 +1,3887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLC Conveyor Sortation - HMI</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   DARK SCADA THEME
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+    --bg-dark: #1a1a2e;
+    --bg-panel: #16213e;
+    --bg-card: #0f3460;
+    --border: #1a3a6a;
+    --text: #e0e0e0;
+    --text-dim: #8899aa;
+    --text-bright: #ffffff;
+    --accent: #00d4ff;
+    --green: #00e676;
+    --orange: #ff9100;
+    --red: #ff1744;
+    --yellow: #ffea00;
+    --blue: #448aff;
+    --purple: #b388ff;
+
+    /* Zone type colors */
+    --zone-transport: #3a4a5a;
+    --zone-infeed: #5a5a00;
+    --zone-merge: #003a6a;
+    --zone-scanner: #004a2a;
+    --zone-branch: #5a3000;
+    --zone-spur: #3a3a5a;
+    --zone-end: #4a2a3a;
+    --zone-reject: #5a1a1a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: var(--bg-dark);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── HEADER / TOOLBAR ─────────────────────────────────────────────── */
+.toolbar {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.toolbar-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--accent);
+    margin-right: 16px;
+}
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-left: 1px solid var(--border);
+    padding-left: 12px;
+}
+.toolbar-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+button {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--bg-card);
+    color: var(--text);
+    transition: all 0.15s;
+}
+button:hover { background: var(--border); }
+button:active { transform: scale(0.97); }
+
+.btn-start { border-color: var(--green); color: var(--green); }
+.btn-start:hover { background: rgba(0, 230, 118, 0.15); }
+.btn-stop { border-color: var(--orange); color: var(--orange); }
+.btn-stop:hover { background: rgba(255, 145, 0, 0.15); }
+
+.btn-estop {
+    background: var(--red);
+    color: white;
+    border-color: #cc0000;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 5px 16px;
+    border-radius: 4px;
+}
+.btn-estop:hover { background: #cc1133; }
+.btn-estop.active {
+    animation: estop-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes estop-pulse {
+    from { box-shadow: 0 0 4px var(--red); }
+    to   { box-shadow: 0 0 16px var(--red); }
+}
+
+.btn-reset { border-color: var(--blue); color: var(--blue); }
+.btn-reset:hover { background: rgba(68, 138, 255, 0.15); }
+
+.speed-input {
+    width: 60px;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--bg-dark);
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    text-align: center;
+}
+
+select {
+    font-family: inherit;
+    font-size: 12px;
+    padding: 4px 6px;
+    background: var(--bg-dark);
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+/* ── TAB BAR ─────────────────────────────────────────────────────── */
+.tab-bar {
+    background: var(--bg-panel);
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    gap: 0;
+    padding: 0 16px;
+}
+.tab-btn {
+    padding: 8px 20px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 0;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+.tab-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.03);
+}
+.tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+.tab-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+.tab-content.active {
+    display: flex;
+}
+
+/* ── MAIN LAYOUT ──────────────────────────────────────────────────── */
+.main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.conveyor-area {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+}
+
+.detail-panel {
+    width: 280px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    padding: 12px;
+    overflow-y: auto;
+    display: none;
+}
+.detail-panel.open { display: block; }
+
+.detail-panel h3 {
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+}
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 11px;
+}
+.detail-key { color: var(--text-dim); }
+.detail-val { color: var(--text-bright); font-weight: bold; }
+
+/* ── CONVEYOR VISUALIZATION ───────────────────────────────────────── */
+.line-section {
+    margin-bottom: 12px;
+}
+.line-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.zone-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+
+.zone-box {
+    width: 80px;
+    height: 44px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    font-size: 9px;
+}
+.zone-box:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+.zone-box.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+}
+
+.zone-id {
+    font-size: 9px;
+    font-weight: bold;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 74px;
+}
+.zone-state {
+    font-size: 8px;
+    color: var(--text-dim);
+}
+.zone-tote {
+    font-size: 8px;
+    color: var(--yellow);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 74px;
+}
+
+/* Zone type backgrounds */
+.zone-transport { background: var(--zone-transport); }
+.zone-infeed    { background: var(--zone-infeed); }
+.zone-merge     { background: var(--zone-merge); }
+.zone-scanner   { background: var(--zone-scanner); }
+.zone-branch    { background: var(--zone-branch); }
+.zone-spur      { background: var(--zone-spur); }
+.zone-end       { background: var(--zone-end); }
+.zone-reject    { background: var(--zone-reject); }
+
+/* State overlays */
+.zone-box.has-tote { border-color: var(--orange); }
+.zone-box.motor-on { border-bottom: 2px solid var(--green); }
+.zone-box.faulted  {
+    border-color: var(--red);
+    animation: fault-blink 0.6s ease-in-out infinite alternate;
+}
+@keyframes fault-blink {
+    from { box-shadow: 0 0 2px var(--red); }
+    to   { box-shadow: 0 0 10px var(--red); }
+}
+
+.zone-arrow {
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 0 2px;
+    user-select: none;
+}
+
+.collapsed-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 8px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    height: 44px;
+}
+.collapsed-group:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.loop-arrow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--purple);
+    font-size: 11px;
+    padding: 4px 8px;
+    margin-top: 4px;
+}
+
+/* ── BOTTOM PANELS ────────────────────────────────────────────────── */
+.bottom-panels {
+    display: flex;
+    border-top: 1px solid var(--border);
+    height: 200px;
+    min-height: 120px;
+}
+
+.panel {
+    flex: 1;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+.panel:last-child { border-right: none; }
+
+.panel-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--accent);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+/* Metrics panel */
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
+}
+.metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px;
+    text-align: center;
+}
+.metric-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--text-bright);
+}
+.metric-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* Alarms panel */
+.alarm-entry {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    align-items: center;
+}
+.alarm-severity {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.alarm-severity.WARNING  { background: var(--yellow); }
+.alarm-severity.FAULT    { background: var(--orange); }
+.alarm-severity.CRITICAL { background: var(--red); }
+.alarm-time { color: var(--text-dim); flex-shrink: 0; }
+.alarm-zone { color: var(--blue); flex-shrink: 0; width: 60px; }
+.alarm-msg  { flex: 1; }
+.alarm-ack  {
+    font-size: 9px;
+    padding: 2px 6px;
+    opacity: 0.6;
+}
+.alarm-acked { opacity: 0.3; text-decoration: line-through; }
+
+/* Status indicator */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+}
+.status-dot.running  { background: var(--green); }
+.status-dot.stopped  { background: var(--text-dim); }
+.status-dot.estopped { background: var(--red); }
+.status-dot.faulted  { background: var(--orange); }
+.status-dot.blocked  { background: var(--yellow); animation: blocked-pulse 1s ease-in-out infinite alternate; }
+
+@keyframes blocked-pulse {
+    from { box-shadow: 0 0 2px var(--yellow); }
+    to   { box-shadow: 0 0 10px var(--yellow); }
+}
+
+/* Connection status */
+.ws-status {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-dark);
+}
+.ws-status.connected { color: var(--green); }
+.ws-status.disconnected { color: var(--red); }
+
+/* ── SIMULATOR TAB ────────────────────────────────────────────────── */
+.sim-panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.sim-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+}
+.sim-card h4 {
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.sim-card label {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 3px;
+}
+.sim-card input, .sim-card select {
+    width: 100%;
+    margin-bottom: 8px;
+}
+.sim-card button {
+    width: 100%;
+    margin-bottom: 4px;
+}
+.sim-result {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    min-height: 14px;
+}
+
+.reject-pile-table {
+    width: 100%;
+    font-size: 11px;
+    border-collapse: collapse;
+}
+.reject-pile-table th,
+.reject-pile-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+.reject-pile-table th {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.toggle-row label {
+    display: inline;
+    margin: 0;
+}
+.toggle-btn {
+    font-size: 10px;
+    padding: 3px 10px;
+    width: auto;
+    margin: 0;
+}
+.toggle-btn.auto { border-color: var(--green); color: var(--green); }
+.toggle-btn.manual { border-color: var(--orange); color: var(--orange); }
+
+/* ── BUILDER TAB ─────────────────────────────────────────────────── */
+.builder-layout {
+    display: flex;
+    height: calc(100vh - 100px);
+    gap: 0;
+}
+.builder-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+}
+.builder-right {
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+.builder-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    align-items: center;
+}
+.builder-toolbar select {
+    padding: 4px 8px;
+    background: var(--bg-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+}
+.builder-toolbar label {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+.builder-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.builder-editor textarea {
+    flex: 1;
+    width: 100%;
+    background: #0a0e1a;
+    color: #a8d8ea;
+    border: none;
+    padding: 12px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: none;
+    tab-size: 2;
+}
+.builder-editor textarea:focus {
+    outline: none;
+    background: #0c1020;
+}
+.builder-feedback {
+    padding: 8px 12px;
+    font-size: 11px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-panel);
+    min-height: 32px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+.builder-feedback.ok { color: var(--green); }
+.builder-feedback.error { color: var(--red); }
+.builder-feedback.info { color: var(--accent); }
+
+.preview-section {
+    padding: 12px;
+}
+.preview-section h4 {
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.preview-tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.preview-track {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+}
+.preview-track-name {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+.preview-zones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.preview-zone {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: default;
+}
+.preview-zone.type-transport { background: var(--zone-transport); }
+.preview-zone.type-infeed { background: var(--zone-infeed); }
+.preview-zone.type-merge { background: var(--zone-merge); }
+.preview-zone.type-scanner { background: var(--zone-scanner); }
+.preview-zone.type-branch { background: var(--zone-branch); }
+.preview-zone.type-end { background: var(--zone-end); }
+
+.preview-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.preview-stat {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+.preview-stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+.preview-stat-value {
+    font-size: 16px;
+    color: var(--text-bright);
+    font-weight: bold;
+}
+
+.template-params {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.template-params input {
+    width: 60px;
+    padding: 3px 6px;
+    background: var(--bg-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    text-align: center;
+}
+/* ── GRID BUILDER (RCT2 Style) ───────────────────────────────────── */
+.grid-builder-layout {
+    display: flex;
+    height: calc(100vh - 100px);
+}
+.grid-builder-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+.grid-builder-props {
+    width: 280px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+.grid-tb {
+    display: flex;
+    gap: 2px;
+    padding: 5px 8px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    align-items: center;
+}
+.grid-tb-sec {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    padding: 0 6px;
+    border-right: 1px solid var(--border);
+}
+.grid-tb-sec:last-child { border-right: none; }
+.grid-tb-lbl {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 2px;
+}
+.gbtn {
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px 7px;
+    min-width: 24px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--bg-card);
+    color: var(--text);
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.gbtn:hover { background: var(--border); }
+.gbtn:active { transform: scale(0.97); }
+.gbtn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.12); }
+.gbtn-t { position: relative; padding: 2px 4px; line-height: 0; }
+.gbtn-t svg { display: inline-block; vertical-align: middle; }
+.gbtn-t .gbtn-name { display: inline-block; vertical-align: middle; margin-left: 3px; font-size: 9px; line-height: 1; }
+.gbtn-t.active { box-shadow: 0 0 6px rgba(0,212,255,0.3); }
+.grid-canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    background: #0d0d1a;
+    position: relative;
+}
+.grid-canvas-wrap.ac-mode {
+    box-shadow: inset 0 0 0 3px var(--accent);
+}
+.grid-canvas {
+    display: inline-grid;
+    margin: 8px;
+    user-select: none;
+}
+.gc {
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.04);
+    position: relative;
+    cursor: crosshair;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: border-color 0.1s;
+    overflow: hidden;
+}
+.gc:hover { border-color: rgba(255,255,255,0.12); }
+.gc.occ { cursor: pointer; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.03); border-radius: 3px; }
+.gc svg { display: block; }
+.gc.ghost { border: 1px dashed var(--accent) !important; background: rgba(0,212,255,0.06) !important; }
+.gc.sel { border: 2px solid var(--accent) !important; box-shadow: 0 0 8px rgba(0,212,255,0.4); }
+.gc.ac-src { animation: gb-pulse 1s ease-in-out infinite alternate; border-color: var(--accent) !important; }
+.gc.ac-path { background: rgba(0,212,255,0.12) !important; border-color: rgba(0,212,255,0.3) !important; }
+.gc.ac-tgt { border-color: var(--green) !important; background: rgba(0,230,118,0.12) !important; }
+.gc.rb { border-color: rgba(0,212,255,0.4) !important; background: rgba(0,212,255,0.05) !important; }
+.gc.drag-ghost { border: 1px dashed var(--accent) !important; background: rgba(0,212,255,0.06) !important; }
+.gc.del-mode:hover { border-color: var(--red) !important; background: rgba(255,23,68,0.15) !important; cursor: not-allowed; }
+@keyframes gb-pulse {
+    from { box-shadow: 0 0 4px var(--accent); }
+    to { box-shadow: 0 0 14px var(--accent); }
+}
+.gp-hdr {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.gp-body { padding: 6px 10px; }
+.gp-sec {
+    margin-top: 8px; padding-top: 4px;
+    border-top: 1px solid var(--border);
+    font-size: 10px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+}
+.gp-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3px 0; font-size: 11px;
+}
+.gp-row label { color: var(--text-dim); font-size: 10px; min-width: 80px; }
+.gp-row input, .gp-row select {
+    background: var(--bg-dark); color: var(--text);
+    border: 1px solid var(--border); border-radius: 2px;
+    padding: 2px 4px; font-size: 10px; font-family: inherit;
+    flex: 1; max-width: 140px;
+}
+.gp-row input[type="checkbox"] { flex: none; width: auto; max-width: none; }
+.gp-btns {
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
+}
+.gp-btns button { font-size: 10px; padding: 5px 8px; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     TOOLBAR
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="toolbar">
+    <span class="toolbar-title">PLC CONVEYOR SORTATION</span>
+
+    <div class="toolbar-group">
+        <span class="status-dot stopped" id="statusDot"></span>
+        <span id="systemState" style="font-size:11px;">STOPPED</span>
+    </div>
+
+    <div class="toolbar-group">
+        <button class="btn-start" onclick="hmiCmd('bHMI_Start')">START</button>
+        <button class="btn-stop" onclick="hmiCmd('bHMI_Stop')">STOP</button>
+        <button class="btn-estop" id="btnEStop" onclick="toggleEStop()">E-STOP</button>
+        <button class="btn-reset" onclick="hmiCmd('bHMI_Reset')">RESET</button>
+    </div>
+
+    <div class="toolbar-group">
+        <span class="toolbar-label">Totes:</span>
+        <input type="number" class="speed-input" id="spawnCount" value="5" min="1" max="100" step="1">
+        <button onclick="addTotes()">ADD TOTES</button>
+    </div>
+
+    <div class="toolbar-group">
+        <span class="toolbar-label">Re-Induct:</span>
+        <button onclick="reinductTote()">RE-INDUCT 1</button>
+        <label style="font-size:10px; display:flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="autoReinduct" onchange="toggleAutoReinduct(this.checked)">
+            Auto
+        </label>
+        <span style="font-size:10px; color:var(--orange);" id="rejectCount">Reject: 0</span>
+    </div>
+
+    <div class="toolbar-group">
+        <span class="toolbar-label">Speed:</span>
+        <input type="number" class="speed-input" id="speedInput" value="1" min="0" max="100" step="0.25" onchange="setSpeed(this.value)">
+        <span class="toolbar-label">x</span>
+    </div>
+
+    <div class="toolbar-group">
+        <span class="ws-status disconnected" id="wsStatus">DISCONNECTED</span>
+        <span style="font-size:10px; color:var(--text-dim);" id="simTime">t=0.00s</span>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     TAB BAR
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('plc')">PLC / HMI</button>
+    <button class="tab-btn" onclick="switchTab('sim')">Simulator</button>
+    <button class="tab-btn" onclick="switchTab('builder')">Builder</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     PLC TAB
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-plc">
+    <div class="main-layout">
+        <div class="conveyor-area" id="conveyorArea">
+            <div style="color:var(--text-dim); font-size:12px; padding:20px;">
+                Connecting to PLC server...
+            </div>
+        </div>
+
+        <!-- Detail side panel -->
+        <div class="detail-panel" id="detailPanel">
+            <h3 id="detailTitle">Zone Details</h3>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <!-- BOTTOM PANELS -->
+    <div class="bottom-panels">
+        <!-- Metrics -->
+        <div class="panel">
+            <div class="panel-header">Metrics</div>
+            <div class="panel-body">
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricActive">0</div>
+                        <div class="metric-label">Active</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricProcessed">0</div>
+                        <div class="metric-label">Scanned</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricDelivered">0</div>
+                        <div class="metric-label">Delivered</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricMismatched">0</div>
+                        <div class="metric-label">Mismatched</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricSpawnQueue">0</div>
+                        <div class="metric-label">Spawn Queue</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricRecirculating">0</div>
+                        <div class="metric-label">Recirculating</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricRejectPile">0</div>
+                        <div class="metric-label">Reject Pile</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="metricStuck">0</div>
+                        <div class="metric-label">Stuck Totes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alarms -->
+        <div class="panel" style="flex: 2;">
+            <div class="panel-header">
+                <span>Alarms <span id="alarmCount" style="color:var(--orange);">(0)</span></span>
+                <button class="alarm-ack" onclick="ackAll()">ACK ALL</button>
+            </div>
+            <div class="panel-body" id="alarmList">
+                <div style="color:var(--text-dim);">No alarms</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SIMULATOR TAB
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-sim">
+    <!-- Per-Track Overview -->
+    <div id="sim-tracks-overview" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+
+    <div class="sim-panel-grid">
+        <!-- Remove Tote -->
+        <div class="sim-card">
+            <h4>Remove Tote</h4>
+            <label>Tote ID</label>
+            <select id="simRemoveTote"></select>
+            <button onclick="simRemoveTote()">Remove from System</button>
+            <div class="sim-result" id="simRemoveResult"></div>
+        </div>
+
+        <!-- Move Tote -->
+        <div class="sim-card">
+            <h4>Move Tote</h4>
+            <label>Tote ID</label>
+            <select id="simMoveToteId"></select>
+            <label>Target Zone</label>
+            <select id="simMoveTargetZone"></select>
+            <button onclick="simMoveTote()">Teleport</button>
+            <div class="sim-result" id="simMoveResult"></div>
+        </div>
+
+        <!-- Stuck Tote -->
+        <div class="sim-card">
+            <h4>Force Stuck</h4>
+            <label>Tote ID</label>
+            <select id="simStuckToteId"></select>
+            <button onclick="simStuckTote(true)">Force Stuck</button>
+            <button onclick="simStuckTote(false)">Clear Stuck</button>
+            <div class="sim-result" id="simStuckResult"></div>
+        </div>
+
+        <!-- Pickup Toggles -->
+        <div class="sim-card">
+            <h4>Pickup Mode (per Spur)</h4>
+            <div id="pickupToggles">
+                <div style="color:var(--text-dim);">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Reject Pile -->
+        <div class="sim-card" style="grid-column: span 2;">
+            <h4>Reject Pile <span id="rejectPileCount" style="color:var(--orange);">(0)</span></h4>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table class="reject-pile-table">
+                    <thead>
+                        <tr><th>#</th><th>Tote ID</th><th>Barcode</th></tr>
+                    </thead>
+                    <tbody id="rejectPileBody">
+                        <tr><td colspan="3" style="color:var(--text-dim);">Empty</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <button onclick="reinductTote()" style="margin-top:8px; width:auto;">Re-Induct One</button>
+            <button onclick="loadInventory()" style="margin-top:8px; width:auto;">Load Inventory</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     BUILDER TAB
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-builder">
+    <div class="grid-builder-layout">
+        <div class="grid-builder-main">
+            <!-- Grid Toolbar -->
+            <div class="grid-tb" id="gbToolbar">
+                <div class="grid-tb-sec">
+                    <span class="grid-tb-lbl">Mode</span>
+                    <button class="gbtn" data-mode="PLACE" onclick="gbSetMode('PLACE')" title="P">Place</button>
+                    <button class="gbtn active" data-mode="SELECT" onclick="gbSetMode('SELECT')" title="S">Select</button>
+                    <button class="gbtn" data-mode="DELETE" onclick="gbSetMode('DELETE')" title="X">Delete</button>
+                </div>
+                <div class="grid-tb-sec" id="gbPalette"></div>
+                <div class="grid-tb-sec" id="gbDirBtns">
+                    <span class="grid-tb-lbl">Dir</span>
+                    <button class="gbtn" data-dir="N" onclick="gbSetDir('N')">&uarr;</button>
+                    <button class="gbtn" data-dir="W" onclick="gbSetDir('W')">&larr;</button>
+                    <button class="gbtn active" data-dir="E" onclick="gbSetDir('E')">&rarr;</button>
+                    <button class="gbtn" data-dir="S" onclick="gbSetDir('S')">&darr;</button>
+                </div>
+                <div class="grid-tb-sec">
+                    <span class="grid-tb-lbl">Track</span>
+                    <select id="gbTrack" style="font-size:10px;padding:2px 4px;" onchange="BUILDER.track=this.value"></select>
+                </div>
+                <div class="grid-tb-sec">
+                    <button class="gbtn" onclick="gbUndo()" title="Ctrl+Z">Undo</button>
+                    <button class="gbtn" onclick="gbClear()">Clear</button>
+                    <button class="gbtn" onclick="gbCompile()">Compile</button>
+                    <button class="gbtn" style="border-color:var(--orange);color:var(--orange);" onclick="gbApply()">Apply</button>
+                    <button class="gbtn" onclick="gbSave()">Save</button>
+                    <button class="gbtn" onclick="gbLoadFile()">Load</button>
+                    <button class="gbtn" onclick="gbLoadCurrent()">Current</button>
+                </div>
+            </div>
+            <!-- Grid Canvas -->
+            <div class="grid-canvas-wrap" id="gbWrap">
+                <div class="grid-canvas" id="gbCanvas"></div>
+            </div>
+            <!-- Feedback Bar -->
+            <div class="builder-feedback info" id="gbFB">Grid builder ready. Click to select, drag to move. Press P to place zones.</div>
+        </div>
+        <!-- Properties Panel -->
+        <div class="grid-builder-props">
+            <div class="gp-hdr">Properties</div>
+            <div class="gp-body" id="gbPBody">
+                <div style="color:var(--text-dim);font-size:11px;padding:8px 0;">Click a zone in Select mode to view properties.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+// ── State ────────────────────────────────────────────────────────────
+let topology = null;
+let selectedZone = null;
+let ws = null;
+let wsConnected = false;
+let eStopActive = false;
+let activeTab = 'plc';
+
+// Collapsible groups: key=groupId, value=bool (expanded)
+const expandedGroups = {};
+
+// Track spur endpoint zones for pickup toggles
+let spurEndpoints = [];
+let rejectEndpoints = [];
+
+// ── Tab Switching ────────────────────────────────────────────────────
+function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    if (tab === 'plc') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tab-plc').classList.add('active');
+    } else if (tab === 'sim') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-sim').classList.add('active');
+        refreshSimTab();
+    } else if (tab === 'builder') {
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.getElementById('tab-builder').classList.add('active');
+        initBuilderTab();
+    }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+async function init() {
+    try {
+        const resp = await fetch('/api/topology');
+        topology = await resp.json();
+        window._lastTopology = topology;
+        buildLayout();
+        buildPickupToggles();
+        connectWS();
+    } catch (e) {
+        document.getElementById('conveyorArea').innerHTML =
+            '<div style="color:var(--red); padding:20px;">Failed to connect to PLC server. Is it running?</div>';
+    }
+}
+
+// ── Build Conveyor Layout ────────────────────────────────────────────
+function buildLayout() {
+    const area = document.getElementById('conveyorArea');
+    area.innerHTML = '';
+    spurEndpoints = [];
+    rejectEndpoints = [];
+
+    // Cross-transfer lookups: zone → [{source/target, track info}]
+    const xferFromZone = {};
+    const xferToZone = {};
+    if (topology.cross_transfers) {
+        for (const x of topology.cross_transfers) {
+            (xferFromZone[x.source] ||= []).push(x);
+            (xferToZone[x.target] ||= []).push(x);
+        }
+    }
+
+    // Zone info lookup (id → {type, track, pickup, spawn, ...})
+    const zoneInfo = {};
+    if (topology.zones) {
+        for (const z of topology.zones) zoneInfo[z.id] = z;
+    }
+
+    // Format track name for section header — use actual track name
+    function trackLabel(name) {
+        return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // Track section header color
+    function trackColor(name) {
+        if (name === 'reject') return 'var(--red)';
+        if (name === 'recirc') return 'var(--purple)';
+        if (name === 'reinduct') return 'var(--blue)';
+        if (name.startsWith('spur_') || name.startsWith('chute')) return 'var(--orange)';
+        return '';
+    }
+
+    const tracks = topology.tracks || [];
+
+    for (const track of tracks) {
+        if (track.zones.length === 0) continue;
+
+        const section = el('div', 'line-section');
+        const label = el('div', 'line-label');
+        label.textContent = trackLabel(track.name);
+        const color = trackColor(track.name);
+        if (color) label.style.color = color;
+        section.appendChild(label);
+
+        const row = el('div', 'zone-row');
+
+        // Show cross-track input arrows at start of track
+        const firstZone = track.zones[0];
+        if (xferToZone[firstZone]) {
+            for (const x of xferToZone[firstZone]) {
+                const from = el('span', 'zone-arrow');
+                from.innerHTML = '&#8627; ' + x.source + ' &rarr;';
+                from.style.color = color || 'var(--text-dim)';
+                from.style.fontSize = '10px';
+                row.appendChild(from);
+            }
+        }
+
+        // Render zones (with collapsing for transport runs)
+        const groups = identifyGroups(track.zones);
+        for (const group of groups) {
+            if (group.type === 'single') {
+                row.appendChild(makeZoneBox(group.zones[0]));
+                row.appendChild(makeArrow());
+            } else {
+                const gid = 'grp_' + group.zones[0];
+                row.appendChild(makeCollapsedGroup(gid, group.zones));
+                row.appendChild(makeArrow());
+            }
+        }
+        // Remove trailing arrow
+        if (row.lastChild) row.removeChild(row.lastChild);
+
+        // End-of-track annotations
+        const lastZone = track.zones[track.zones.length - 1];
+        const lastZoneInfo = zoneInfo[lastZone] || {};
+
+        if (lastZoneInfo.pickup) {
+            // Pickup endpoint
+            const pickup = el('span', 'zone-arrow');
+            if (track.name === 'reject') {
+                pickup.innerHTML = ' &rarr; [HUMAN PICKUP]';
+                pickup.style.color = 'var(--red)';
+                rejectEndpoints.push(lastZone);
+            } else {
+                pickup.innerHTML = ' &rarr; [ROBOT]';
+                pickup.style.color = 'var(--green)';
+                spurEndpoints.push(lastZone);
+            }
+            row.appendChild(pickup);
+        } else if (xferFromZone[lastZone]) {
+            // Cross-track output at end of track
+            for (const x of xferFromZone[lastZone]) {
+                const to = el('span', 'zone-arrow');
+                to.innerHTML = ' &rarr; &#8626; ' + x.target;
+                to.style.color = color || 'var(--text-dim)';
+                row.appendChild(to);
+            }
+        }
+
+        section.appendChild(row);
+        area.appendChild(section);
+    }
+}
+
+function identifyGroups(zoneIds) {
+    const groups = [];
+    let transportRun = [];
+
+    for (const zid of zoneIds) {
+        const zoneInfo = getZoneInfo(zid);
+        const isMajor = ['merge', 'scanner', 'branch', 'infeed', 'end'].includes(zoneInfo.type);
+
+        if (isMajor) {
+            if (transportRun.length > 0) {
+                if (transportRun.length <= 2) {
+                    // Too few to collapse, show individually
+                    for (const tid of transportRun) groups.push({ type: 'single', zones: [tid] });
+                } else {
+                    groups.push({ type: 'collapsed', zones: [...transportRun] });
+                }
+                transportRun = [];
+            }
+            groups.push({ type: 'single', zones: [zid] });
+        } else {
+            transportRun.push(zid);
+        }
+    }
+
+    // Flush remaining
+    if (transportRun.length > 0) {
+        if (transportRun.length <= 2) {
+            for (const tid of transportRun) groups.push({ type: 'single', zones: [tid] });
+        } else {
+            groups.push({ type: 'collapsed', zones: [...transportRun] });
+        }
+    }
+
+    return groups;
+}
+
+function getZoneInfo(zoneId) {
+    if (!topology) return { type: 'transport' };
+    const zone = topology.zones.find(z => z.id === zoneId);
+    return zone || { type: 'transport' };
+}
+
+function makeZoneBox(zoneId) {
+    const info = getZoneInfo(zoneId);
+    let zoneType = info.type || 'transport';
+    const track = info.track || '';
+    // Track-based styling for transport zones
+    if (zoneType === 'transport') {
+        if (track === 'reject') zoneType = 'reject';
+        else if (track.startsWith('spur_') || track.startsWith('chute')) zoneType = 'spur';
+    }
+    const box = el('div', `zone-box zone-${zoneType}`);
+    box.id = 'zone_' + zoneId;
+    box.dataset.zoneId = zoneId;
+    box.onclick = () => selectZone(zoneId);
+
+    const idSpan = el('span', 'zone-id');
+    idSpan.textContent = zoneId;
+    box.appendChild(idSpan);
+
+    const stateSpan = el('span', 'zone-state');
+    stateSpan.id = 'zstate_' + zoneId;
+    stateSpan.textContent = 'IDLE';
+    box.appendChild(stateSpan);
+
+    const toteSpan = el('span', 'zone-tote');
+    toteSpan.id = 'ztote_' + zoneId;
+    box.appendChild(toteSpan);
+
+    return box;
+}
+
+function makeArrow() {
+    const arrow = el('span', 'zone-arrow');
+    arrow.innerHTML = '&rarr;';
+    return arrow;
+}
+
+function makeCollapsedGroup(groupId, zones) {
+    const wrapper = el('div', '');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+
+    // Collapsed view
+    const collapsed = el('div', 'collapsed-group');
+    collapsed.id = 'cg_' + groupId;
+    collapsed.innerHTML = `&rarr; ${zones.length} zones &rarr;`;
+    collapsed.title = zones.join(', ');
+    collapsed.onclick = () => toggleGroup(groupId, zones, wrapper);
+
+    // Expanded view (hidden by default)
+    const expanded = el('div', '');
+    expanded.id = 'eg_' + groupId;
+    expanded.style.display = 'none';
+    expanded.style.gap = '2px';
+    expanded.classList.add('zone-row');
+
+    for (let i = 0; i < zones.length; i++) {
+        expanded.appendChild(makeZoneBox(zones[i]));
+        if (i < zones.length - 1) expanded.appendChild(makeArrow());
+    }
+
+    // Collapse button
+    const collapseBtn = el('button', '');
+    collapseBtn.textContent = '[-]';
+    collapseBtn.style.cssText = 'font-size:9px; padding:2px 4px; margin-left:2px;';
+    collapseBtn.onclick = (e) => { e.stopPropagation(); toggleGroup(groupId, zones, wrapper); };
+    expanded.appendChild(collapseBtn);
+
+    wrapper.appendChild(collapsed);
+    wrapper.appendChild(expanded);
+
+    if (expandedGroups[groupId]) {
+        collapsed.style.display = 'none';
+        expanded.style.display = 'flex';
+    }
+
+    return wrapper;
+}
+
+function toggleGroup(groupId, zones, wrapper) {
+    const isExpanded = expandedGroups[groupId];
+    expandedGroups[groupId] = !isExpanded;
+
+    const collapsed = wrapper.querySelector('.collapsed-group');
+    const expanded = wrapper.querySelector('[id^="eg_"]');
+
+    if (isExpanded) {
+        collapsed.style.display = 'flex';
+        expanded.style.display = 'none';
+    } else {
+        collapsed.style.display = 'none';
+        expanded.style.display = 'flex';
+    }
+}
+
+// ── Build Pickup Toggle Buttons ──────────────────────────────────────
+function buildPickupToggles() {
+    const container = document.getElementById('pickupToggles');
+    const allEndpoints = [...spurEndpoints, ...rejectEndpoints];
+
+    if (allEndpoints.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-dim);">No spur endpoints</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    for (const zid of allEndpoints) {
+        const isReject = zid.startsWith('REJECT_');
+        const row = el('div', 'toggle-row');
+
+        const label = el('label', '');
+        label.textContent = zid;
+        label.style.fontSize = '11px';
+        label.style.color = isReject ? 'var(--red)' : 'var(--text)';
+
+        const btn = el('button', 'toggle-btn auto');
+        btn.id = 'toggle_' + zid;
+        btn.textContent = 'AUTO';
+        btn.onclick = () => togglePickupMode(zid, btn);
+
+        const manualBtn = el('button', 'toggle-btn');
+        manualBtn.textContent = 'PICK UP';
+        manualBtn.style.fontSize = '10px';
+        manualBtn.style.padding = '3px 8px';
+        manualBtn.style.width = 'auto';
+        manualBtn.style.marginLeft = '4px';
+        manualBtn.onclick = () => manualPickup(zid);
+
+        row.appendChild(label);
+        const btnGroup = el('div', '');
+        btnGroup.style.display = 'flex';
+        btnGroup.style.gap = '4px';
+        btnGroup.appendChild(btn);
+        btnGroup.appendChild(manualBtn);
+        row.appendChild(btnGroup);
+
+        container.appendChild(row);
+    }
+}
+
+async function togglePickupMode(zoneId, btn) {
+    const isCurrentlyAuto = btn.classList.contains('auto');
+    const newAuto = !isCurrentlyAuto;
+
+    await fetch('/api/hmi/auto_pickup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zone_id: zoneId, auto: newAuto }),
+    });
+
+    if (newAuto) {
+        btn.className = 'toggle-btn auto';
+        btn.textContent = 'AUTO';
+    } else {
+        btn.className = 'toggle-btn manual';
+        btn.textContent = 'MANUAL';
+    }
+}
+
+async function manualPickup(zoneId) {
+    await fetch('/api/hmi/manual_pickup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zone_id: zoneId }),
+    });
+}
+
+// ── Zone Selection ───────────────────────────────────────────────────
+function selectZone(zoneId) {
+    // Deselect previous
+    document.querySelectorAll('.zone-box.selected').forEach(el => el.classList.remove('selected'));
+
+    selectedZone = zoneId;
+    const box = document.getElementById('zone_' + zoneId);
+    if (box) box.classList.add('selected');
+
+    const panel = document.getElementById('detailPanel');
+    panel.classList.add('open');
+    document.getElementById('detailTitle').textContent = zoneId;
+    updateDetailPanel(zoneId);
+}
+
+function updateDetailPanel(zoneId) {
+    const content = document.getElementById('detailContent');
+    if (!window._lastState || !window._lastState.zones) {
+        content.innerHTML = '<div style="color:var(--text-dim)">No data</div>';
+        return;
+    }
+    const zd = window._lastState.zones[zoneId];
+    if (!zd) {
+        content.innerHTML = '<div style="color:var(--text-dim)">Zone not found</div>';
+        return;
+    }
+
+    content.innerHTML = `
+        ${detailRow('State', zd.eState)}
+        ${detailRow('Motor', zd.bMotorRun ? 'ON' : 'OFF')}
+        ${detailRow('Tote Present', zd.bTotePresent ? 'YES' : 'NO')}
+        ${detailRow('Faulted', zd.bFaulted ? 'YES' : 'NO')}
+        ${detailRow('Speed', zd.rActualSpeed.toFixed(1) + '%')}
+        ${detailRow('Ready', zd.bReady ? 'YES' : 'NO')}
+        <hr style="border-color:var(--border); margin:6px 0;">
+        ${detailRow('Tote ID', zd.sToteID || '--')}
+        ${detailRow('Barcode', zd.sBarcode || '--')}
+        ${detailRow('Chute', zd.eChuteAssignment)}
+        ${detailRow('Recirc Count', zd.iRecircCount || 0)}
+        ${detailRow('Scan Fails', zd.iScanFailCount || 0)}
+    `;
+}
+
+function detailRow(key, val) {
+    return `<div class="detail-row"><span class="detail-key">${key}</span><span class="detail-val">${val}</span></div>`;
+}
+
+// ── WebSocket ────────────────────────────────────────────────────────
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.onopen = () => {
+        wsConnected = true;
+        document.getElementById('wsStatus').textContent = 'CONNECTED';
+        document.getElementById('wsStatus').className = 'ws-status connected';
+    };
+
+    ws.onclose = () => {
+        wsConnected = false;
+        document.getElementById('wsStatus').textContent = 'DISCONNECTED';
+        document.getElementById('wsStatus').className = 'ws-status disconnected';
+        // Reconnect after 2s
+        setTimeout(connectWS, 2000);
+    };
+
+    ws.onerror = () => {
+        ws.close();
+    };
+
+    ws.onmessage = (event) => {
+        const state = JSON.parse(event.data);
+        window._lastState = state;
+        updateHMI(state);
+    };
+}
+
+// ── HMI Update ───────────────────────────────────────────────────────
+function updateHMI(state) {
+    // System state
+    const sysState = state.system.eSystemState;
+    document.getElementById('systemState').textContent = sysState;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot ' + sysState.toLowerCase();
+
+    // Sim time
+    document.getElementById('simTime').textContent = `t=${state.system.simTime}s`;
+
+    // E-Stop button visual
+    const btnEs = document.getElementById('btnEStop');
+    eStopActive = (sysState === 'ESTOPPED');
+    if (eStopActive) {
+        btnEs.classList.add('active');
+    } else {
+        btnEs.classList.remove('active');
+    }
+
+    // Reject pile count in toolbar
+    const rpc = state.system.iRejectPileCount || 0;
+    document.getElementById('rejectCount').textContent = `Reject: ${rpc}`;
+
+    // Metrics
+    const m = state.metrics;
+    document.getElementById('metricActive').textContent = m.diActiveTotes;
+    document.getElementById('metricProcessed').textContent = m.diTotalProcessed;
+    document.getElementById('metricSpawnQueue').textContent = m.iSpawnRemaining || 0;
+    document.getElementById('metricRejectPile').textContent = state.system.iRejectPileCount || 0;
+    document.getElementById('metricStuck').textContent = state.system.iStuckToteCount || 0;
+    if (m.robot) {
+        document.getElementById('metricDelivered').textContent = m.robot.diTotalDelivered;
+        document.getElementById('metricMismatched').textContent = m.robot.diTotalMismatched;
+    }
+    // Recirculating count: totes on system with iRecircCount > 0
+    let recircCount = 0;
+    for (const zd of Object.values(state.zones)) {
+        if (zd.bTotePresent && zd.iRecircCount > 0) recircCount++;
+    }
+    document.getElementById('metricRecirculating').textContent = recircCount;
+
+    // Zone updates
+    for (const [zoneId, zd] of Object.entries(state.zones)) {
+        const box = document.getElementById('zone_' + zoneId);
+        if (!box) continue;
+
+        // State classes
+        box.classList.toggle('has-tote', zd.bTotePresent);
+        box.classList.toggle('motor-on', zd.bMotorRun);
+        box.classList.toggle('faulted', zd.bFaulted);
+
+        // State text
+        const stateEl = document.getElementById('zstate_' + zoneId);
+        if (stateEl) stateEl.textContent = zd.eState;
+
+        // Tote text
+        const toteEl = document.getElementById('ztote_' + zoneId);
+        if (toteEl) {
+            if (zd.bTotePresent && zd.sToteID) {
+                let label = zd.sToteID;
+                if (zd.sBarcode) label += ' [' + zd.sBarcode.substring(0, 7) + ']';
+                toteEl.textContent = label;
+            } else {
+                toteEl.textContent = '';
+            }
+        }
+    }
+
+    // Selected zone detail
+    if (selectedZone) {
+        updateDetailPanel(selectedZone);
+    }
+
+    // Alarms
+    updateAlarms(state.alarms);
+
+    // Refresh sim tab per-track view if active
+    if (activeTab === 'sim') refreshSimTab();
+}
+
+function updateAlarms(alarms) {
+    const list = document.getElementById('alarmList');
+    const count = alarms.diUnackAlarmCount;
+    document.getElementById('alarmCount').textContent = `(${count})`;
+
+    if (!alarms.aAlarmBuffer || alarms.aAlarmBuffer.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-dim);">No alarms</div>';
+        return;
+    }
+
+    let html = '';
+    for (const a of alarms.aAlarmBuffer) {
+        const ackedClass = a.bAcknowledged ? 'alarm-acked' : '';
+        html += `
+            <div class="alarm-entry ${ackedClass}">
+                <span class="alarm-severity ${a.eSeverity}"></span>
+                <span class="alarm-time">${a.sTimestamp}</span>
+                <span class="alarm-zone">${a.sZoneID}</span>
+                <span class="alarm-msg">[A${String(a.iAlarmCode).padStart(3,'0')}] ${a.sMessage}</span>
+            </div>
+        `;
+    }
+    list.innerHTML = html;
+}
+
+// ── Simulator Tab Refresh ────────────────────────────────────────────
+async function refreshSimTab() {
+    // Populate tote dropdowns from current state
+    if (!window._lastState) return;
+
+    const activeTotes = [];
+    const emptyZones = [];
+
+    for (const [zoneId, zd] of Object.entries(window._lastState.zones)) {
+        if (zd.bTotePresent && zd.sToteID) {
+            activeTotes.push({ id: zd.sToteID, zone: zoneId });
+        }
+        if (!zd.bTotePresent) {
+            emptyZones.push(zoneId);
+        }
+    }
+
+    // Update tote selects
+    const toteOptions = activeTotes.map(t => `<option value="${t.id}">${t.id} (${t.zone})</option>`).join('');
+    document.getElementById('simRemoveTote').innerHTML = toteOptions || '<option>No totes</option>';
+    document.getElementById('simMoveToteId').innerHTML = toteOptions || '<option>No totes</option>';
+    document.getElementById('simStuckToteId').innerHTML = toteOptions || '<option>No totes</option>';
+
+    // Update zone select (empty zones only)
+    const zoneOptions = emptyZones.map(z => `<option value="${z}">${z}</option>`).join('');
+    document.getElementById('simMoveTargetZone').innerHTML = zoneOptions || '<option>No empty zones</option>';
+
+    // Fetch per-track sim data
+    try {
+        const simResp = await fetch('/api/debug/sim');
+        const simData = await simResp.json();
+        const overview = document.getElementById('sim-tracks-overview');
+        if (overview && simData.tracks) {
+            // Use display_order from topology if available, else Object.keys
+            const trackOrder = (window._lastTopology && window._lastTopology.display_order)
+                ? window._lastTopology.display_order
+                : Object.keys(simData.tracks);
+            let html = '';
+            for (const trackName of trackOrder) {
+                const trackData = simData.tracks[trackName];
+                if (!trackData) continue;
+                const totes = trackData.totes || {};
+                const count = Object.keys(totes).length;
+                const label = trackName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                html += `<div class="sim-card" style="flex:1; min-width:200px; max-width:350px;">`;
+                html += `<h4 style="margin:0 0 4px 0;">${label} <span style="color:var(--cyan);">(${count})</span></h4>`;
+                if (count > 0) {
+                    html += `<table style="width:100%; font-size:11px; border-collapse:collapse;">`;
+                    html += `<tr style="color:var(--text-dim);"><th style="text-align:left;">Tote</th><th style="text-align:left;">Zone</th><th style="text-align:right;">Pos</th></tr>`;
+                    for (const [toteId, info] of Object.entries(totes)) {
+                        html += `<tr><td>${toteId}</td><td>${info.owner_zone_id || '—'}</td><td style="text-align:right;">${(info.position_cm || 0).toFixed(0)}cm</td></tr>`;
+                    }
+                    html += `</table>`;
+                } else {
+                    html += `<div style="color:var(--text-dim); font-size:11px;">No totes</div>`;
+                }
+                html += `</div>`;
+            }
+            // Transfer areas
+            if (simData.transfer_areas && Object.keys(simData.transfer_areas).length > 0) {
+                html += `<div class="sim-card" style="flex:1; min-width:200px; max-width:350px;">`;
+                html += `<h4 style="margin:0 0 4px 0;">Transfers</h4>`;
+                html += `<table style="width:100%; font-size:11px; border-collapse:collapse;">`;
+                html += `<tr style="color:var(--text-dim);"><th style="text-align:left;">Link</th><th style="text-align:left;">Tote</th></tr>`;
+                for (const [key, toteId] of Object.entries(simData.transfer_areas)) {
+                    html += `<tr><td>${key}</td><td>${toteId || '—'}</td></tr>`;
+                }
+                html += `</table></div>`;
+            }
+            overview.innerHTML = html;
+        }
+    } catch (e) {}
+
+    // Fetch reject pile
+    try {
+        const resp = await fetch('/api/reject_pile');
+        const data = await resp.json();
+        document.getElementById('rejectPileCount').textContent = `(${data.count})`;
+
+        const tbody = document.getElementById('rejectPileBody');
+        if (data.pile.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-dim);">Empty</td></tr>';
+        } else {
+            tbody.innerHTML = data.pile.map((item, i) =>
+                `<tr><td>${i + 1}</td><td>${item.tote_id}</td><td>${item.barcode}</td></tr>`
+            ).join('');
+        }
+    } catch (e) {}
+}
+
+// ── Simulator Commands ───────────────────────────────────────────────
+async function simRemoveTote() {
+    const toteId = document.getElementById('simRemoveTote').value;
+    if (!toteId) return;
+
+    try {
+        const resp = await fetch('/api/sim/remove_tote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tote_id: toteId }),
+        });
+        const data = await resp.json();
+        document.getElementById('simRemoveResult').textContent =
+            resp.ok ? `Removed ${toteId}` : data.error;
+        setTimeout(refreshSimTab, 500);
+    } catch (e) {
+        document.getElementById('simRemoveResult').textContent = 'Error';
+    }
+}
+
+async function simMoveTote() {
+    const toteId = document.getElementById('simMoveToteId').value;
+    const targetZone = document.getElementById('simMoveTargetZone').value;
+    if (!toteId || !targetZone) return;
+
+    try {
+        const resp = await fetch('/api/sim/move_tote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tote_id: toteId, target_zone: targetZone }),
+        });
+        const data = await resp.json();
+        document.getElementById('simMoveResult').textContent =
+            resp.ok ? `Moved ${toteId} to ${targetZone}` : data.error;
+        setTimeout(refreshSimTab, 500);
+    } catch (e) {
+        document.getElementById('simMoveResult').textContent = 'Error';
+    }
+}
+
+async function simStuckTote(stuck) {
+    const toteId = document.getElementById('simStuckToteId').value;
+    if (!toteId) return;
+
+    try {
+        const resp = await fetch('/api/sim/stuck_tote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tote_id: toteId, stuck: stuck }),
+        });
+        const data = await resp.json();
+        document.getElementById('simStuckResult').textContent =
+            resp.ok ? `${stuck ? 'Stuck' : 'Cleared'} ${toteId}` : data.error;
+    } catch (e) {
+        document.getElementById('simStuckResult').textContent = 'Error';
+    }
+}
+
+// ── HMI Commands ─────────────────────────────────────────────────────
+async function hmiCmd(tag) {
+    await fetch(`/api/hmi/${tag}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: true }),
+    });
+}
+
+function toggleEStop() {
+    // Toggle E-Stop latching state
+    fetch('/api/hmi/bHMI_EStop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: !eStopActive }),
+    });
+}
+
+async function setSpeed(val) {
+    const speed = parseFloat(val) || 1.0;
+    await fetch('/api/speed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: speed }),
+    });
+}
+
+async function addTotes() {
+    const count = parseInt(document.getElementById('spawnCount').value) || 1;
+    await fetch('/api/hmi/iHMI_SpawnCount', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: count }),
+    });
+}
+
+async function reinductTote() {
+    await fetch('/api/hmi/reinduct', { method: 'POST' });
+}
+
+async function toggleAutoReinduct(checked) {
+    await fetch('/api/hmi/bHMI_AutoReinduct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: checked }),
+    });
+}
+
+async function loadInventory() {
+    await fetch('/api/inventory/load', { method: 'POST' });
+}
+
+async function ackAll() {
+    await hmiCmd('bHMI_AckAll');
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function el(tag, className) {
+    const e = document.createElement(tag);
+    if (className) e.className = className;
+    return e;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// GRID BUILDER (RCT2 Style Visual Track Builder)
+// ══════════════════════════════════════════════════════════════════════
+
+const GB_C = 40, GB_R = 25, GB_SZ = 40;
+
+const DIRS = {
+    N: { dx:0, dy:-1, arrow:'\u2191', opp:'S' },
+    S: { dx:0, dy:1,  arrow:'\u2193', opp:'N' },
+    E: { dx:1, dy:0,  arrow:'\u2192', opp:'W' },
+    W: { dx:-1, dy:0, arrow:'\u2190', opp:'E' },
+};
+function rotR(d) { return {N:'E',E:'S',S:'W',W:'N'}[d]; }
+function rotL(d) { return {N:'W',W:'S',S:'E',E:'N'}[d]; }
+
+const ZT = {
+    transport: { l:'T',  css:'zone-transport', name:'Transport' },
+    scanner:   { l:'Sc', css:'zone-scanner',   name:'Scanner' },
+    branch:    { l:'B',  css:'zone-branch',    name:'Branch' },
+    merge:     { l:'M',  css:'zone-merge',     name:'Merge' },
+    jump:      { l:'J',  css:'zone-end',       name:'Jump' },
+    spawn:     { l:'Sp', css:'zone-infeed',    name:'Spawn' },
+    pickup:    { l:'Pk', css:'zone-spur',      name:'Pickup' },
+};
+
+var GRID = { cells: {} };
+var BUILDER = {
+    mode: 'SELECT', placeType: 'transport', dir: 'E',
+    lastKey: null, track: 'main', wirePort: 'primary',
+    acSrc: null, selKey: null, selKeys: new Set(), ghostKey: null,
+    undoStack: [], ids: {}, chuteN: 1, prevTrack: null, acPaths: [],
+    dragFrom: null, dragMoved: false, clipboard: null,
+    rubberStart: null, rubberEnd: null,
+};
+
+let gbInitDone = false;
+
+// ── Init ──────────────────────────────────────────────────────────────
+async function initBuilderTab() {
+    if (gbInitDone) return;
+    gbInitDone = true;
+    gbBuildPalette();
+    gbInitGrid();
+    gbUpdateTrackSel();
+    await gbLoadCurrent();
+    document.addEventListener('keydown', gbKeyHandler);
+    // Global mouseup to clear drag/rubber band state if mouse released outside grid
+    document.addEventListener('mouseup', function() {
+        if (BUILDER.dragFrom) {
+            BUILDER.dragFrom = null;
+            BUILDER.dragMoved = false;
+            if (BUILDER.ghostKey) {
+                var gp = BUILDER.ghostKey.split(',');
+                BUILDER.ghostKey = null;
+                gbUpdateCell(+gp[0], +gp[1]);
+            }
+        }
+        if (BUILDER.rubberStart) {
+            gbClearRubberBand();
+        }
+        gbClearDragGhosts();
+    });
+}
+
+function gbBuildPalette() {
+    const pal = document.getElementById('gbPalette');
+    pal.innerHTML = '<span class="grid-tb-lbl">Zone</span>';
+    for (const [type, info] of Object.entries(ZT)) {
+        const b = document.createElement('button');
+        b.className = 'gbtn gbtn-t' + (type === BUILDER.placeType ? ' active' : '');
+        b.dataset.type = type;
+        b.title = info.name + ' (' + info.l + ')';
+        // Use mini SVG icon matching the grid cell visuals
+        var svg = gbCellSVG(type, 'E');
+        // Resize to 24x24 for the button
+        svg = svg.replace('width="40" height="40"', 'width="24" height="24"');
+        b.innerHTML = svg + '<span class="gbtn-name">' + info.name + '</span>';
+        b.onclick = () => gbSetType(type);
+        pal.appendChild(b);
+    }
+}
+
+function gbInitGrid() {
+    const c = document.getElementById('gbCanvas');
+    c.style.gridTemplateColumns = 'repeat(' + GB_C + ',' + GB_SZ + 'px)';
+    c.style.gridTemplateRows = 'repeat(' + GB_R + ',' + GB_SZ + 'px)';
+    c.innerHTML = '';
+    for (let r = 0; r < GB_R; r++) {
+        for (let col = 0; col < GB_C; col++) {
+            const d = document.createElement('div');
+            d.className = 'gc';
+            d.id = 'gc' + col + '_' + r;
+            d.addEventListener('click', gbClick.bind(null, col, r));
+            d.addEventListener('mouseenter', gbHover.bind(null, col, r));
+            d.addEventListener('mouseleave', gbLeave.bind(null, col, r));
+            d.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+            d.addEventListener('mousedown', gbMouseDown.bind(null, col, r));
+            d.addEventListener('mouseup', gbMouseUp.bind(null, col, r));
+            c.appendChild(d);
+        }
+    }
+    // Container-level mousedown: resolves cell from coordinates, bypasses per-cell SVG event issues
+    c.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        var rect = c.getBoundingClientRect();
+        var col = Math.floor((e.clientX - rect.left + c.scrollLeft) / GB_SZ);
+        var row = Math.floor((e.clientY - rect.top + c.scrollTop) / GB_SZ);
+        if (col < 0 || col >= GB_C || row < 0 || row >= GB_R) return;
+        var k = col + ',' + row;
+        if (BUILDER.mode === 'PLACE' && !GRID.cells[k]) {
+            gbSaveUndo(); gbPlace(col, row);
+            e.stopPropagation();
+        } else if (BUILDER.mode === 'DELETE' && GRID.cells[k]) {
+            gbSaveUndo(); gbDeleteCell(k);
+            e.stopPropagation();
+        }
+    });
+}
+
+// ── Mode / Type / Direction ──────────────────────────────────────────
+function gbSetMode(m) {
+    if (BUILDER.mode === 'AUTOCOMPLETE' && m !== 'AUTOCOMPLETE') gbExitAC();
+    BUILDER.mode = m;
+    if (m !== 'SELECT' && m !== 'AUTOCOMPLETE') { BUILDER.selKey = null; BUILDER.selKeys.clear(); }
+    BUILDER.ghostKey = null;
+    document.querySelectorAll('[data-mode]').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === m);
+    });
+    document.getElementById('gbWrap').classList.toggle('ac-mode', m === 'AUTOCOMPLETE');
+    // Restore track after divert build
+    if (m !== 'PLACE' && BUILDER.prevTrack) {
+        BUILDER.track = BUILDER.prevTrack;
+        BUILDER.prevTrack = null;
+        BUILDER.wirePort = 'primary';
+        gbUpdateTrackSel();
+    }
+    gbRenderAll();
+    gbUpdateProps();
+    var msgs = { PLACE:'Click grid to place zones. Right-click to exit.',
+                 SELECT:'Click to select, drag to rearrange zones.',
+                 DELETE:'Click a zone to delete it. Right-click to exit.',
+                 AUTOCOMPLETE:'Hover a target zone, click to connect. Esc to cancel.' };
+    gbFeedback(msgs[m] || '', 'info');
+}
+
+function gbSetType(t) {
+    BUILDER.placeType = t;
+    document.querySelectorAll('.gbtn-t').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.type === t);
+    });
+    if (BUILDER.mode !== 'PLACE') gbSetMode('PLACE');
+    // Refresh ghost preview
+    if (BUILDER.ghostKey) {
+        var gp = BUILDER.ghostKey.split(',');
+        gbUpdateCell(+gp[0], +gp[1]);
+    }
+}
+
+function gbSetDir(d) {
+    BUILDER.dir = d;
+    document.querySelectorAll('[data-dir]').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.dir === d);
+    });
+    // In SELECT mode, also update all selected zones' direction
+    if (BUILDER.mode === 'SELECT' && BUILDER.selKeys.size > 0) {
+        gbSaveUndo();
+        BUILDER.selKeys.forEach(function(sk) {
+            var cell = GRID.cells[sk];
+            if (cell) {
+                cell.direction = d;
+                gbReWireZone(sk);
+                gbReWireNeighbors(sk);
+            }
+        });
+        gbRenderAll();
+        gbUpdateProps();
+    }
+    // Refresh ghost preview in PLACE mode
+    if (BUILDER.mode === 'PLACE' && BUILDER.ghostKey) {
+        var gp = BUILDER.ghostKey.split(',');
+        gbUpdateCell(+gp[0], +gp[1]);
+    }
+}
+
+function gbRotate(dir) {
+    // dir: 1 = clockwise (E), -1 = counter-clockwise (Q)
+    var fn = dir > 0 ? rotR : rotL;
+    if (BUILDER.mode === 'PLACE') {
+        // Rotate build direction
+        gbSetDir(fn(BUILDER.dir));
+    } else if (BUILDER.mode === 'SELECT' && BUILDER.selKeys.size > 0) {
+        // Rotate all selected zones
+        gbSaveUndo();
+        BUILDER.selKeys.forEach(function(sk) {
+            var cell = GRID.cells[sk];
+            if (cell) {
+                cell.direction = fn(cell.direction);
+                gbReWireZone(sk);
+                gbReWireNeighbors(sk);
+            }
+        });
+        // Update direction buttons to match primary selection
+        if (BUILDER.selKey && GRID.cells[BUILDER.selKey]) {
+            BUILDER.dir = GRID.cells[BUILDER.selKey].direction;
+            document.querySelectorAll('[data-dir]').forEach(function(b) {
+                b.classList.toggle('active', b.dataset.dir === BUILDER.dir);
+            });
+        }
+        gbRenderAll();
+        gbUpdateProps();
+    }
+}
+
+// ── Grid Events ──────────────────────────────────────────────────────
+function gbClick(col, row, e) {
+    var k = col + ',' + row;
+    if (BUILDER.mode === 'PLACE') {
+        return; // Placement handled in mousedown for responsiveness
+    } else if (BUILDER.mode === 'SELECT') {
+        if (BUILDER.dragMoved) { BUILDER.dragMoved = false; return; }
+        gbSelectCell(k, e && e.shiftKey);
+    } else if (BUILDER.mode === 'DELETE') {
+        return; // Deletion handled in mousedown for responsiveness
+    } else if (BUILDER.mode === 'AUTOCOMPLETE') {
+        if (GRID.cells[k] && k !== BUILDER.acSrc) { gbSaveUndo(); gbExecAC(k); }
+    }
+}
+
+function gbHover(col, row) {
+    var k = col + ',' + row;
+    // Rubber band update
+    if (BUILDER.mode === 'SELECT' && BUILDER.rubberStart) {
+        BUILDER.rubberEnd = {col: col, row: row};
+        gbUpdateRubberBand();
+        return;
+    }
+    var old = BUILDER.ghostKey;
+    if (BUILDER.mode === 'PLACE' && !GRID.cells[k]) {
+        BUILDER.ghostKey = k;
+        if (old && old !== k) { var p = old.split(','); gbUpdateCell(+p[0], +p[1]); }
+        gbUpdateCell(col, row);
+    } else if (BUILDER.mode === 'SELECT' && BUILDER.dragFrom && k !== BUILDER.dragFrom) {
+        if (BUILDER.selKeys.size > 1 && BUILDER.selKeys.has(BUILDER.dragFrom)) {
+            // Multi-drag ghost preview
+            gbClearDragGhosts();
+            var fp = BUILDER.dragFrom.split(',');
+            var dx = col - (+fp[0]), dy = row - (+fp[1]);
+            BUILDER.selKeys.forEach(function(sk) {
+                var sp = sk.split(',');
+                var gc = (+sp[0]) + dx, gr = (+sp[1]) + dy;
+                if (gc >= 0 && gc < GB_C && gr >= 0 && gr < GB_R) {
+                    var gk = gc + ',' + gr;
+                    if (!GRID.cells[gk] || BUILDER.selKeys.has(gk)) {
+                        var el = document.getElementById('gc' + gc + '_' + gr);
+                        if (el) el.classList.add('drag-ghost');
+                    }
+                }
+            });
+        } else {
+            // Single drag preview ghost
+            BUILDER.ghostKey = k;
+            if (old && old !== k) { var p = old.split(','); gbUpdateCell(+p[0], +p[1]); }
+            gbUpdateCell(col, row);
+        }
+    } else if (BUILDER.mode === 'AUTOCOMPLETE' && GRID.cells[k] && k !== BUILDER.acSrc) {
+        gbClearACPaths();
+        var path = gbBFS(BUILDER.acSrc, k);
+        if (path) {
+            BUILDER.acPaths = path;
+            path.forEach(function(pk) {
+                var p = pk.split(',');
+                var el = document.getElementById('gc' + p[0] + '_' + p[1]);
+                if (el) el.classList.add('ac-path');
+            });
+            var el = document.getElementById('gc' + col + '_' + row);
+            if (el) el.classList.add('ac-tgt');
+        }
+    } else if (BUILDER.mode === 'DELETE' && GRID.cells[k]) {
+        var el = document.getElementById('gc' + col + '_' + row);
+        if (el) el.classList.add('del-mode');
+    } else {
+        if (BUILDER.ghostKey) {
+            BUILDER.ghostKey = null;
+            if (old) { var p = old.split(','); gbUpdateCell(+p[0], +p[1]); }
+        }
+    }
+}
+
+function gbLeave(col, row) {
+    var k = col + ',' + row;
+    if (BUILDER.ghostKey === k) { BUILDER.ghostKey = null; gbUpdateCell(col, row); }
+    if (BUILDER.mode === 'AUTOCOMPLETE') gbClearACPaths();
+    var el = document.getElementById('gc' + col + '_' + row);
+    if (el) el.classList.remove('del-mode', 'ac-tgt');
+}
+
+function gbRightClick(col, row) {
+    if (BUILDER.mode === 'PLACE' || BUILDER.mode === 'DELETE') gbSetMode('SELECT');
+    else if (BUILDER.mode === 'AUTOCOMPLETE') gbExitAC();
+}
+
+function gbUpdateRubberBand() {
+    document.querySelectorAll('.gc.rb').forEach(function(el) { el.classList.remove('rb'); });
+    if (!BUILDER.rubberStart || !BUILDER.rubberEnd) return;
+    var s = BUILDER.rubberStart, e = BUILDER.rubberEnd;
+    var minC = Math.min(s.col, e.col), maxC = Math.max(s.col, e.col);
+    var minR = Math.min(s.row, e.row), maxR = Math.max(s.row, e.row);
+    for (var r = minR; r <= maxR; r++) {
+        for (var c = minC; c <= maxC; c++) {
+            var el = document.getElementById('gc' + c + '_' + r);
+            if (el) el.classList.add('rb');
+        }
+    }
+}
+
+function gbClearRubberBand() {
+    document.querySelectorAll('.gc.rb').forEach(function(el) { el.classList.remove('rb'); });
+    BUILDER.rubberStart = null;
+    BUILDER.rubberEnd = null;
+}
+
+function gbClearDragGhosts() {
+    document.querySelectorAll('.gc.drag-ghost').forEach(function(el) { el.classList.remove('drag-ghost'); });
+}
+
+function gbMoveMulti(dx, dy) {
+    var keys = Array.from(BUILDER.selKeys);
+    // Validate all target positions
+    var moves = [];
+    for (var i = 0; i < keys.length; i++) {
+        var cell = GRID.cells[keys[i]];
+        if (!cell) continue;
+        var nc = cell.col + dx, nr = cell.row + dy;
+        if (nc < 0 || nc >= GB_C || nr < 0 || nr >= GB_R) return false;
+        var nk = nc + ',' + nr;
+        if (GRID.cells[nk] && !BUILDER.selKeys.has(nk)) return false;
+        moves.push({fromKey: keys[i], toKey: nk, cell: cell});
+    }
+    // Remove all from old positions
+    moves.forEach(function(m) { delete GRID.cells[m.fromKey]; });
+    // Place all at new positions
+    var newSelKeys = new Set();
+    moves.forEach(function(m) {
+        m.cell.col += dx;
+        m.cell.row += dy;
+        GRID.cells[m.toKey] = m.cell;
+        newSelKeys.add(m.toKey);
+    });
+    // Update selection keys
+    BUILDER.selKeys = newSelKeys;
+    if (BUILDER.selKey) {
+        var sp = BUILDER.selKey.split(',');
+        BUILDER.selKey = (+sp[0] + dx) + ',' + (+sp[1] + dy);
+    }
+    // Re-wire all moved zones and their neighbors
+    newSelKeys.forEach(function(k) {
+        gbReWireZone(k);
+        gbReWireNeighbors(k);
+    });
+    gbRenderAll();
+    gbUpdateProps();
+    return true;
+}
+
+// ── Place ────────────────────────────────────────────────────────────
+function gbPlace(col, row) {
+    var k = col + ',' + row;
+    var type = BUILDER.placeType;
+    var zoneId = gbGenId(type, BUILDER.track);
+    var cell = {
+        col: col, row: row, zoneId: zoneId, zoneType: type, direction: BUILDER.dir,
+        trackGroup: BUILDER.track,
+        sDownstream: null, sDivertDownstream: null, sUpstream2: null,
+        iTargetChute: null, eMergePriority: null,
+        bIsSpawnPoint: type === 'spawn',
+        bIsPickupPoint: type === 'pickup',
+        bForceRelease: type === 'jump',
+        rLength_cm: null, rGap_cm: null, rWidth_cm: null,
+        rSensorOffset_cm: null, rMaxSpeed: null,
+        // Spawn config
+        sSpawnList: type === 'spawn' ? 'default' : null,
+        eSpawnTrigger: type === 'spawn' ? 'backpressure' : null,
+        // Pickup config
+        ePickupMode: type === 'pickup' ? 'auto' : null,
+        rPickupRate_s: type === 'pickup' ? 5.0 : null,
+        rPickupRandom: type === 'pickup' ? 0.0 : null,
+    };
+    if (type === 'branch') cell.iTargetChute = BUILDER.chuteN++;
+    if (type === 'merge') cell.eMergePriority = 'INPUT1_PRIORITY';
+
+    // Apply clipboard overrides when pasting
+    if (BUILDER.clipboard && BUILDER.clipboard.zoneType === type) {
+        var cb = BUILDER.clipboard;
+        if (cb.trackGroup) cell.trackGroup = cb.trackGroup;
+        if (cb.iTargetChute != null) cell.iTargetChute = cb.iTargetChute;
+        if (cb.eMergePriority) cell.eMergePriority = cb.eMergePriority;
+        cell.bIsSpawnPoint = cb.bIsSpawnPoint || false;
+        cell.bIsPickupPoint = cb.bIsPickupPoint || false;
+        cell.bForceRelease = cb.bForceRelease || false;
+        if (cb.rLength_cm != null) cell.rLength_cm = cb.rLength_cm;
+        if (cb.rGap_cm != null) cell.rGap_cm = cb.rGap_cm;
+        if (cb.rWidth_cm != null) cell.rWidth_cm = cb.rWidth_cm;
+        if (cb.rSensorOffset_cm != null) cell.rSensorOffset_cm = cb.rSensorOffset_cm;
+        if (cb.rMaxSpeed != null) cell.rMaxSpeed = cb.rMaxSpeed;
+        if (cb.sSpawnList != null) cell.sSpawnList = cb.sSpawnList;
+        if (cb.eSpawnTrigger != null) cell.eSpawnTrigger = cb.eSpawnTrigger;
+        if (cb.ePickupMode != null) cell.ePickupMode = cb.ePickupMode;
+        if (cb.rPickupRate_s != null) cell.rPickupRate_s = cb.rPickupRate_s;
+        if (cb.rPickupRandom != null) cell.rPickupRandom = cb.rPickupRandom;
+    }
+
+    GRID.cells[k] = cell;
+
+    // ── Spatial auto-wiring ──────────────────────────────────────────
+    // 1. Forward: if this zone points at an occupied cell, wire downstream
+    var fwd = DIRS[cell.direction];
+    var fwdKey = (col + fwd.dx) + ',' + (row + fwd.dy);
+    var fwdCell = GRID.cells[fwdKey];
+    if (fwdCell && !cell.sDownstream) {
+        cell.sDownstream = fwdCell.zoneId;
+    }
+
+    // 2a. Branch: if divert direction cell is occupied, wire sDivertDownstream
+    if (cell.zoneType === 'branch') {
+        var divDir = rotR(cell.direction);
+        var divFwd = DIRS[divDir];
+        var divKey = (col + divFwd.dx) + ',' + (row + divFwd.dy);
+        var divCell = GRID.cells[divKey];
+        if (divCell && !cell.sDivertDownstream) {
+            cell.sDivertDownstream = divCell.zoneId;
+        }
+    }
+
+    // 2a2. Merge: if input-2 direction cell is occupied, wire sUpstream2
+    if (cell.zoneType === 'merge') {
+        var in2Dir = rotL(cell.direction);
+        var in2Fwd = DIRS[in2Dir];
+        var in2Key = (col + in2Fwd.dx) + ',' + (row + in2Fwd.dy);
+        var in2Cell = GRID.cells[in2Key];
+        if (in2Cell && !cell.sUpstream2) {
+            cell.sUpstream2 = in2Cell.zoneId;
+        }
+    }
+
+    // 2b. Neighbors pointing at us: wire their output to this zone
+    var allDirs = ['N','S','E','W'];
+    for (var di = 0; di < 4; di++) {
+        var dd = DIRS[allDirs[di]];
+        var adjC = col + dd.dx, adjR = row + dd.dy;
+        var adjKey = adjC + ',' + adjR;
+        var adj = GRID.cells[adjKey];
+        if (!adj) continue;
+        // Does adj's primary direction point at our cell?
+        var adjFwd = DIRS[adj.direction];
+        if (adjFwd && adj.col + adjFwd.dx === col && adj.row + adjFwd.dy === row) {
+            if (!adj.sDownstream) {
+                adj.sDownstream = zoneId;
+                gbUpdateCell(adj.col, adj.row);
+            }
+        }
+        // Branch divert direction pointing at us?
+        if (adj.zoneType === 'branch') {
+            var divDir = rotR(adj.direction);
+            var divFwd = DIRS[divDir];
+            if (divFwd && adj.col + divFwd.dx === col && adj.row + divFwd.dy === row) {
+                if (!adj.sDivertDownstream) {
+                    adj.sDivertDownstream = zoneId;
+                    gbUpdateCell(adj.col, adj.row);
+                }
+            }
+        }
+    }
+
+    // 3. Fallback: sequential wiring from last placed zone (only if adjacent
+    //    AND prev zone's direction actually points at this cell)
+    if (BUILDER.lastKey && GRID.cells[BUILDER.lastKey]) {
+        var prev = GRID.cells[BUILDER.lastKey];
+        var isAdj = Math.abs(prev.col - col) + Math.abs(prev.row - row) === 1;
+        if (isAdj) {
+            var prevFwd = DIRS[prev.direction];
+            var prevPointsAtUs = prevFwd && prev.col + prevFwd.dx === col && prev.row + prevFwd.dy === row;
+            var prevDivPointsAtUs = false;
+            if (prev.zoneType === 'branch') {
+                var pDivFwd = DIRS[rotR(prev.direction)];
+                prevDivPointsAtUs = pDivFwd && prev.col + pDivFwd.dx === col && prev.row + pDivFwd.dy === row;
+            }
+            if (BUILDER.wirePort === 'divert' && prevDivPointsAtUs && !prev.sDivertDownstream) {
+                prev.sDivertDownstream = zoneId;
+                gbUpdateCell(prev.col, prev.row);
+            } else if (BUILDER.wirePort === 'primary' && prevPointsAtUs && !prev.sDownstream) {
+                prev.sDownstream = zoneId;
+                gbUpdateCell(prev.col, prev.row);
+            }
+        }
+    }
+    if (BUILDER.wirePort === 'divert') BUILDER.wirePort = 'primary';
+
+    BUILDER.lastKey = k;
+    gbUpdateCell(col, row);
+    gbUpdateTrackSel();
+    gbFeedback('Placed ' + ZT[type].name + ' "' + zoneId + '" at (' + col + ',' + row + ')', 'ok');
+}
+
+// ── Delete ───────────────────────────────────────────────────────────
+function gbDeleteCell(k) {
+    var cell = GRID.cells[k];
+    if (!cell) return;
+    var zid = cell.zoneId;
+    // Unwire references
+    for (var ok in GRID.cells) {
+        var oc = GRID.cells[ok];
+        var changed = false;
+        if (oc.sDownstream === zid) { oc.sDownstream = null; changed = true; }
+        if (oc.sDivertDownstream === zid) { oc.sDivertDownstream = null; changed = true; }
+        if (oc.sUpstream2 === zid) { oc.sUpstream2 = null; changed = true; }
+        if (changed) gbUpdateCell(oc.col, oc.row);
+    }
+    delete GRID.cells[k];
+    if (BUILDER.lastKey === k) BUILDER.lastKey = null;
+    BUILDER.selKeys.delete(k);
+    if (BUILDER.selKey === k) {
+        BUILDER.selKey = BUILDER.selKeys.size > 0 ? Array.from(BUILDER.selKeys)[BUILDER.selKeys.size - 1] : null;
+        gbUpdateProps();
+    }
+    var p = k.split(',');
+    gbUpdateCell(+p[0], +p[1]);
+    gbFeedback('Deleted "' + zid + '"', 'info');
+}
+
+// ── Select ───────────────────────────────────────────────────────────
+function gbSelectCell(k, shift) {
+    if (shift) {
+        // Shift+click: toggle zone in/out of multi-selection
+        if (BUILDER.selKeys.has(k)) {
+            BUILDER.selKeys.delete(k);
+            if (BUILDER.selKey === k) {
+                BUILDER.selKey = BUILDER.selKeys.size > 0 ? Array.from(BUILDER.selKeys)[BUILDER.selKeys.size - 1] : null;
+            }
+        } else if (GRID.cells[k]) {
+            BUILDER.selKeys.add(k);
+            BUILDER.selKey = k;
+        }
+    } else {
+        // Normal click: single select (clear others)
+        BUILDER.selKeys.clear();
+        if (GRID.cells[k]) {
+            BUILDER.selKeys.add(k);
+            BUILDER.selKey = k;
+        } else {
+            BUILDER.selKey = null;
+        }
+    }
+    gbRenderAll();
+    gbUpdateProps();
+}
+
+// ── ID Generation ────────────────────────────────────────────────────
+function gbGenId(type, track) {
+    var ids = BUILDER.ids;
+    var existing = {};
+    for (var k in GRID.cells) existing[GRID.cells[k].zoneId] = true;
+    var prefix, id;
+    switch (type) {
+        case 'transport':
+            prefix = track === 'main' ? 'C' : track === 'recirc' ? 'C_RC' :
+                     track === 'reinduct' ? 'C_RI' : track === 'reject' ? 'REJECT' :
+                     track.startsWith('spur_') ? 'C_S' + track.slice(5) : 'C';
+            ids[prefix] = (ids[prefix] || 0) + 1;
+            id = prefix + '_' + ids[prefix]; break;
+        case 'scanner':
+            ids.SCN = (ids.SCN || 0) + 1;
+            id = ids.SCN === 1 ? 'SCANNER' : 'SCANNER_' + ids.SCN; break;
+        case 'branch':
+            ids.BR = (ids.BR || 0) + 1;
+            id = 'BRANCH_' + ids.BR; break;
+        case 'merge':
+            ids.MR = (ids.MR || 0) + 1;
+            id = ids.MR === 1 ? 'MERGE_MAIN' : 'MERGE_' + ids.MR; break;
+        case 'jump':
+            ids.JMP = (ids.JMP || 0) + 1;
+            id = 'JUMP_' + ids.JMP; break;
+        case 'spawn':
+            ids.SP = (ids.SP || 0) + 1;
+            id = 'SPAWN_' + ids.SP; break;
+        case 'pickup':
+            ids.PK = (ids.PK || 0) + 1;
+            id = 'PICKUP_' + ids.PK; break;
+        default:
+            ids.Z = (ids.Z || 0) + 1;
+            id = 'ZONE_' + ids.Z;
+    }
+    while (existing[id]) id += '_';
+    return id;
+}
+
+// ── Cell Rendering ───────────────────────────────────────────────────
+// ── SVG Cell Rendering ──────────────────────────────────────────────
+function _svgL(x1, y1, x2, y2, color, dashed, w) {
+    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="'+(w||2)+'" stroke-linecap="round"'+(dashed?' stroke-dasharray="3,3"':'')+'/>';
+}
+function _svgTri(pts, color) { return '<polygon points="'+pts+'" fill="'+color+'"/>'; }
+
+function _svgArrow(dir, color, fromCenter, toCenter) {
+    var ahl = 10, ahw = 6, sx, sy, tx, ty, bx, by;
+    if (dir === 'E') {
+        sx = fromCenter?20:0; sy = 20; tx = toCenter?24:38; ty = 20;
+        bx = tx - ahl; return _svgL(sx,sy,bx,ty,color) + _svgTri(tx+','+ty+' '+bx+','+(ty-ahw)+' '+bx+','+(ty+ahw), color);
+    } else if (dir === 'W') {
+        sx = fromCenter?20:40; sy = 20; tx = toCenter?16:2; ty = 20;
+        bx = tx + ahl; return _svgL(sx,sy,bx,ty,color) + _svgTri(tx+','+ty+' '+bx+','+(ty-ahw)+' '+bx+','+(ty+ahw), color);
+    } else if (dir === 'N') {
+        sx = 20; sy = fromCenter?20:40; tx = 20; ty = toCenter?16:2;
+        by = ty + ahl; return _svgL(sx,sy,tx,by,color) + _svgTri(tx+','+ty+' '+(tx-ahw)+','+by+' '+(tx+ahw)+','+by, color);
+    } else {
+        sx = 20; sy = fromCenter?20:0; tx = 20; ty = toCenter?24:38;
+        by = ty - ahl; return _svgL(sx,sy,tx,by,color) + _svgTri(tx+','+ty+' '+(tx-ahw)+','+by+' '+(tx+ahw)+','+by, color);
+    }
+}
+
+function _svgEdgeXY(dir) {
+    if (dir==='N') return [20,0]; if (dir==='S') return [20,40];
+    if (dir==='E') return [40,20]; return [0,20];
+}
+
+function _svgCamera(dir) {
+    var cx = 20, cy = 8, rot = 0;
+    if (dir==='N'||dir==='S') { cx = 8; cy = 20; rot = 90; }
+    return '<g transform="translate('+cx+','+cy+') rotate('+rot+')"><rect x="-6" y="-4" width="12" height="8" rx="1.5" fill="none" stroke="#00e676" stroke-width="1.2"/><circle cx="0" cy="0" r="2.5" fill="none" stroke="#00e676" stroke-width="1"/></g>';
+}
+
+function _svgJump(dir) {
+    // Portal/teleport icon: two offset arcs at the destination edge
+    var e = _svgEdgeXY(dir);
+    var cx = (e[0]+20)/2+((e[0]-20)*0.3), cy = (e[1]+20)/2+((e[1]-20)*0.3);
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="none" stroke="#ff5555" stroke-width="1.5" stroke-dasharray="3,2"/>' +
+           '<circle cx="'+cx+'" cy="'+cy+'" r="2" fill="#ff5555"/>';
+}
+
+function _svgSpawn(dir) {
+    var p = _svgEdgeXY(DIRS[dir].opp);
+    var cx = (p[0]+20)/2, cy = (p[1]+20)/2;
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="rgba(0,230,118,0.15)" stroke="#00e676" stroke-width="1.5"/>';
+}
+
+function _svgPickup(dir) {
+    var p = _svgEdgeXY(dir);
+    var cx = (p[0]+20)/2, cy = (p[1]+20)/2;
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="none" stroke="#b388ff" stroke-width="1.2"/>' +
+           '<circle cx="'+cx+'" cy="'+cy+'" r="1.5" fill="#b388ff"/>';
+}
+
+function gbCellSVG(type, dir, data) {
+    var s = '', c = '#aaa';
+    switch (type) {
+        case 'transport':
+            s += _svgArrow(dir, c); break;
+        case 'scanner':
+            s += _svgArrow(dir, c) + _svgCamera(dir); break;
+        case 'branch':
+            s += _svgArrow(dir, c) + _svgArrow(rotR(dir), '#ff9100', true, false); break;
+        case 'merge':
+            var opp = _svgEdgeXY(DIRS[dir].opp);
+            s += _svgL(opp[0], opp[1], 20, 20, c);
+            var i2d = rotL(dir), i2 = _svgEdgeXY(i2d);
+            s += _svgL(i2[0], i2[1], 20, 20, '#448aff', !(data && data.sUpstream2));
+            s += _svgArrow(dir, c, true, false);
+            break;
+        case 'jump':
+            s += _svgArrow(dir, c) + _svgJump(dir); break;
+        case 'spawn':
+            s += _svgSpawn(dir) + _svgArrow(dir, c); break;
+        case 'pickup':
+            s += _svgArrow(dir, c) + _svgPickup(dir); break;
+    }
+    return '<svg viewBox="0 0 40 40" width="40" height="40" style="display:block">' + s + '</svg>';
+}
+
+function gbUpdateCell(col, row) {
+    var k = col + ',' + row;
+    var el = document.getElementById('gc' + col + '_' + row);
+    if (!el) return;
+    var data = GRID.cells[k];
+    el.className = 'gc';
+    el.innerHTML = '';
+    el.style.background = '';
+    el.title = '';
+
+    if (data) {
+        el.classList.add('occ');
+        el.title = data.zoneId + ' (' + (ZT[data.zoneType]||ZT.transport).name + ')';
+        el.innerHTML = gbCellSVG(data.zoneType, data.direction, data);
+        if (BUILDER.selKeys.has(k)) el.classList.add('sel');
+        if (BUILDER.acSrc === k) el.classList.add('ac-src');
+    } else {
+        if (BUILDER.ghostKey === k && BUILDER.mode === 'PLACE') {
+            el.classList.add('ghost');
+            el.innerHTML = gbCellSVG(BUILDER.placeType, BUILDER.dir);
+            var svg = el.querySelector('svg');
+            if (svg) { svg.style.opacity = '0.35'; svg.style.pointerEvents = 'none'; }
+        }
+        if (BUILDER.ghostKey === k && BUILDER.mode === 'SELECT' && BUILDER.dragFrom) {
+            var srcCell = GRID.cells[BUILDER.dragFrom];
+            if (srcCell) {
+                el.classList.add('ghost');
+                el.innerHTML = gbCellSVG(srcCell.zoneType, srcCell.direction, srcCell);
+                var svg = el.querySelector('svg');
+                if (svg) svg.style.opacity = '0.5';
+            }
+        }
+    }
+}
+
+function gbRenderAll() {
+    for (var r = 0; r < GB_R; r++) {
+        for (var c = 0; c < GB_C; c++) {
+            gbUpdateCell(c, r);
+        }
+    }
+}
+
+// ── Properties Panel ─────────────────────────────────────────────────
+function gbUpdateProps() {
+    var body = document.getElementById('gbPBody');
+    if (!BUILDER.selKey || !GRID.cells[BUILDER.selKey]) {
+        if (BUILDER.selKeys.size > 1) {
+            body.innerHTML = '<div style="color:var(--accent);font-size:11px;padding:8px 0;font-weight:bold;">' + BUILDER.selKeys.size + ' zones selected</div>' +
+                '<div style="color:var(--text-dim);font-size:10px;padding:4px 0;">Arrow keys / E/Q to rotate all<br>Delete to remove all<br>Ctrl+C to copy primary</div>';
+            return;
+        }
+        body.innerHTML = '<div style="color:var(--text-dim);font-size:11px;padding:8px 0;">Click a zone in Select mode to view properties.</div>';
+        return;
+    }
+    var multiHeader = '';
+    if (BUILDER.selKeys.size > 1) {
+        multiHeader = '<div style="color:var(--accent);font-size:11px;padding:4px 0;font-weight:bold;border-bottom:1px solid var(--border);margin-bottom:4px;">' + BUILDER.selKeys.size + ' zones selected (showing primary)</div>';
+    }
+    var cell = GRID.cells[BUILDER.selKey];
+    var zt = ZT[cell.zoneType] || ZT.transport;
+    var h = '';
+
+    h += '<div class="gp-sec">Identity</div>';
+    h += gpR('Zone ID', '<span style="color:var(--text-dim);font-family:monospace;font-size:10px;user-select:all">' + esc(cell.zoneId) + '</span>');
+    h += gpR('Type', '<span style="color:var(--text-bright)">' + zt.name + '</span>');
+    h += gpR('Direction', '<select onchange="gbPropSet(\'direction\',this.value)">' +
+        ['N','S','E','W'].map(function(d) { return '<option' + (d===cell.direction?' selected':'') + '>' + d + '</option>'; }).join('') + '</select>');
+    h += gpR('Track', '<select onchange="gbPropSet(\'trackGroup\',this.value)">' + gbTrackOpts(cell.trackGroup) + '</select>');
+    h += '<div style="display:flex;gap:4px;margin:2px 0 4px 0;">' +
+        '<button style="flex:1;font-size:9px;padding:2px 4px;background:var(--bg-medium);border:1px solid var(--border);color:var(--text-dim);border-radius:3px;cursor:pointer;" onclick="gbAddTrack()">+ Add Track</button>' +
+        '<button style="flex:1;font-size:9px;padding:2px 4px;background:var(--bg-medium);border:1px solid var(--border);color:var(--text-dim);border-radius:3px;cursor:pointer;" onclick="gbRemoveTrack()">- Remove Track</button>' +
+        '</div>';
+    h += '<div class="gp-sec">Connections</div>';
+    h += gpR('Downstream', '<select onchange="gbPropSet(\'sDownstream\',this.value||null)">' + gbZoneOpts(cell.sDownstream, cell.zoneId) + '</select>');
+    if (cell.zoneType === 'branch')
+        h += gpR('Divert DS', '<select onchange="gbPropSet(\'sDivertDownstream\',this.value||null)">' + gbZoneOpts(cell.sDivertDownstream, cell.zoneId) + '</select>');
+    if (cell.zoneType === 'merge')
+        h += gpR('Alt Feed', '<span style="opacity:.6">' + (cell.sUpstream2 || '(auto-inferred)') + '</span>');
+
+    if (cell.zoneType === 'branch') {
+        h += '<div class="gp-sec">Branch</div>';
+        h += gpR('Chute #', '<input type="number" value="' + (cell.iTargetChute||0) + '" onchange="gbPropSet(\'iTargetChute\',+this.value)">');
+    }
+    if (cell.zoneType === 'merge') {
+        h += '<div class="gp-sec">Merge</div>';
+        h += gpR('Priority', '<select onchange="gbPropSet(\'eMergePriority\',this.value)">' +
+            ['INPUT1_PRIORITY','INPUT2_PRIORITY','ALTERNATE'].map(function(v) {
+                return '<option' + (v===cell.eMergePriority?' selected':'') + '>' + v + '</option>';
+            }).join('') + '</select>');
+    }
+
+    if (cell.zoneType === 'spawn') {
+        h += '<div class="gp-sec">Spawn Config</div>';
+        h += gpR('Spawn List', '<select onchange="gbPropSet(\'sSpawnList\',this.value)">' +
+            ['default','reinduct','custom'].map(function(v) {
+                return '<option value="' + v + '"' + (v===(cell.sSpawnList||'default')?' selected':'') + '>' + v + '</option>';
+            }).join('') + '</select>');
+        h += gpR('Trigger', '<select onchange="gbPropSet(\'eSpawnTrigger\',this.value)">' +
+            ['backpressure','continuous','manual'].map(function(v) {
+                return '<option value="' + v + '"' + (v===(cell.eSpawnTrigger||'backpressure')?' selected':'') + '>' + v + '</option>';
+            }).join('') + '</select>');
+    }
+
+    if (cell.zoneType === 'pickup') {
+        h += '<div class="gp-sec">Pickup Config</div>';
+        h += gpR('Mode', '<select onchange="gbPropSet(\'ePickupMode\',this.value)">' +
+            ['auto','manual'].map(function(v) {
+                return '<option value="' + v + '"' + (v===(cell.ePickupMode||'auto')?' selected':'') + '>' + v + '</option>';
+            }).join('') + '</select>');
+        h += gpR('Rate (s)', '<input type="number" step="0.5" min="0.5" value="' + (cell.rPickupRate_s!=null?cell.rPickupRate_s:5) + '" onchange="gbPropSet(\'rPickupRate_s\',+this.value)">');
+        h += gpR('Random %', '<input type="number" step="5" min="0" max="100" value="' + (cell.rPickupRandom!=null?cell.rPickupRandom:0) + '" onchange="gbPropSet(\'rPickupRandom\',+this.value)" title="0=fixed rate, 100=fully random">');
+    }
+
+    h += '<div class="gp-sec">Flags</div>';
+    h += gpR('Force Release', '<input type="checkbox" ' + (cell.bForceRelease?'checked':'') + ' onchange="gbPropSet(\'bForceRelease\',this.checked)">');
+
+    h += '<div class="gp-sec">Config (blank=default)</div>';
+    h += gpR('Length cm', '<input type="number" value="' + (cell.rLength_cm!=null?cell.rLength_cm:'') + '" onchange="gbPropSet(\'rLength_cm\',this.value?+this.value:null)" placeholder="default">');
+    h += gpR('Gap cm', '<input type="number" value="' + (cell.rGap_cm!=null?cell.rGap_cm:'') + '" onchange="gbPropSet(\'rGap_cm\',this.value?+this.value:null)" placeholder="default">');
+    h += gpR('Max Speed', '<input type="number" value="' + (cell.rMaxSpeed!=null?cell.rMaxSpeed:'') + '" onchange="gbPropSet(\'rMaxSpeed\',this.value?+this.value:null)" placeholder="default">');
+
+    h += '<div class="gp-btns">';
+    if (cell.zoneType === 'branch' && !cell.sDivertDownstream)
+        h += '<button onclick="gbBuildDivert()" style="border-color:var(--orange);color:var(--orange);">Build Divert Spur &rarr;</button>';
+    h += '<button onclick="gbStartAC(\'' + BUILDER.selKey + '\')" style="border-color:var(--accent);color:var(--accent);">Auto-Complete To...</button>';
+    h += '</div>';
+
+    body.innerHTML = multiHeader + h;
+}
+
+function gpR(label, ctrl) {
+    return '<div class="gp-row"><label>' + label + '</label>' + ctrl + '</div>';
+}
+
+function gbPropSet(prop, val, isRename) {
+    if (!BUILDER.selKey || !GRID.cells[BUILDER.selKey]) return;
+    gbSaveUndo();
+    // Per-zone props that only apply to the primary selection
+    var perZoneOnly = { zoneId: true, sDownstream: true, sDivertDownstream: true, sUpstream2: true };
+    if (perZoneOnly[prop] || isRename) {
+        var cell = GRID.cells[BUILDER.selKey];
+        if (isRename && prop === 'zoneId') {
+            var oldId = cell.zoneId, newId = val;
+            if (oldId === newId) return;
+            for (var k in GRID.cells) {
+                var oc = GRID.cells[k];
+                if (oc.sDownstream === oldId) oc.sDownstream = newId;
+                if (oc.sDivertDownstream === oldId) oc.sDivertDownstream = newId;
+                if (oc.sUpstream2 === oldId) oc.sUpstream2 = newId;
+            }
+            cell.zoneId = newId;
+            gbRenderAll();
+        } else {
+            cell[prop] = val;
+            gbUpdateCell(cell.col, cell.row);
+        }
+    } else {
+        // Apply to ALL selected zones
+        var keys = BUILDER.selKeys.size > 0 ? Array.from(BUILDER.selKeys) : [BUILDER.selKey];
+        for (var i = 0; i < keys.length; i++) {
+            var c = GRID.cells[keys[i]];
+            if (!c) continue;
+            c[prop] = val;
+            if (prop === 'direction') {
+                gbReWireZone(keys[i]);
+                gbReWireNeighbors(keys[i]);
+            }
+            gbUpdateCell(c.col, c.row);
+        }
+        if (prop === 'trackGroup') gbUpdateTrackSel();
+    }
+    gbUpdateProps();
+}
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ── Zone Options Dropdown ────────────────────────────────────────────
+function gbZoneOpts(selected, excludeId) {
+    var opts = '<option value="">-- none --</option>';
+    var ids = [];
+    for (var k in GRID.cells) {
+        var zid = GRID.cells[k].zoneId;
+        if (zid !== excludeId) ids.push(zid);
+    }
+    ids.sort();
+    for (var i = 0; i < ids.length; i++) {
+        opts += '<option value="' + esc(ids[i]) + '"' + (ids[i] === selected ? ' selected' : '') + '>' + esc(ids[i]) + '</option>';
+    }
+    return opts;
+}
+
+function gbGetAllTracks() {
+    var tracks = {};
+    for (var k in GRID.cells) tracks[GRID.cells[k].trackGroup] = true;
+    ['main','recirc','reinduct','reject'].forEach(function(t) { tracks[t] = true; });
+    return Object.keys(tracks).sort();
+}
+
+function gbTrackOpts(selected) {
+    var tracks = gbGetAllTracks();
+    var opts = '';
+    for (var i = 0; i < tracks.length; i++) {
+        opts += '<option value="' + esc(tracks[i]) + '"' + (tracks[i] === selected ? ' selected' : '') + '>' + esc(tracks[i]) + '</option>';
+    }
+    return opts;
+}
+
+function gbAddTrack() {
+    var name = prompt('New track name:');
+    if (!name || !name.trim()) return;
+    name = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    var tracks = gbGetAllTracks();
+    if (tracks.indexOf(name) >= 0) {
+        gbFeedback('Track "' + name + '" already exists.', 'warn');
+        return;
+    }
+    // Set the selected zone to this new track
+    if (BUILDER.selKey && GRID.cells[BUILDER.selKey]) {
+        gbSaveUndo();
+        GRID.cells[BUILDER.selKey].trackGroup = name;
+        gbUpdateCell(GRID.cells[BUILDER.selKey].col, GRID.cells[BUILDER.selKey].row);
+    }
+    // Also update toolbar track selector
+    BUILDER.track = name;
+    gbUpdateTrackSel();
+    gbUpdateProps();
+    gbFeedback('Created track "' + name + '"', 'ok');
+}
+
+function gbRemoveTrack() {
+    var protected_tracks = ['main','recirc','reinduct','reject'];
+    var tracks = gbGetAllTracks();
+    var removable = tracks.filter(function(t) { return protected_tracks.indexOf(t) < 0; });
+    if (removable.length === 0) {
+        gbFeedback('No custom tracks to remove.', 'warn');
+        return;
+    }
+    var name = prompt('Remove track (zones will move to "main"):\n\nCustom tracks: ' + removable.join(', '));
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    if (protected_tracks.indexOf(name) >= 0) {
+        gbFeedback('Cannot remove built-in track "' + name + '".', 'warn');
+        return;
+    }
+    if (tracks.indexOf(name) < 0) {
+        gbFeedback('Track "' + name + '" not found.', 'warn');
+        return;
+    }
+    gbSaveUndo();
+    var count = 0;
+    for (var k in GRID.cells) {
+        if (GRID.cells[k].trackGroup === name) {
+            GRID.cells[k].trackGroup = 'main';
+            gbUpdateCell(GRID.cells[k].col, GRID.cells[k].row);
+            count++;
+        }
+    }
+    if (BUILDER.track === name) BUILDER.track = 'main';
+    gbUpdateTrackSel();
+    gbUpdateProps();
+    gbFeedback('Removed track "' + name + '" (' + count + ' zones moved to main)', 'ok');
+}
+
+// ── Drag to Rearrange (SELECT mode) ─────────────────────────────────
+function gbMouseDown(col, row, e) {
+    if (e.button === 2) { gbShowRadial(e.clientX, e.clientY); return; }
+    if (e.button !== 0) return;
+    var k = col + ',' + row;
+    // PLACE mode: immediate placement on mousedown (no click delay)
+    if (BUILDER.mode === 'PLACE') {
+        if (!GRID.cells[k]) { gbSaveUndo(); gbPlace(col, row); }
+        return;
+    }
+    // DELETE mode: immediate delete on mousedown
+    if (BUILDER.mode === 'DELETE') {
+        if (GRID.cells[k]) { gbSaveUndo(); gbDeleteCell(k); }
+        return;
+    }
+    if (BUILDER.mode !== 'SELECT') return;
+    if (GRID.cells[k]) {
+        BUILDER.dragFrom = k;
+        BUILDER.dragMoved = false;
+    } else {
+        // Empty cell — start rubber band selection
+        BUILDER.rubberStart = {col: col, row: row};
+        BUILDER.rubberEnd = {col: col, row: row};
+    }
+}
+
+function gbMouseUp(col, row, e) {
+    if (e.button !== 0) return;
+    if (BUILDER.mode !== 'SELECT') return;
+
+    // Rubber band selection
+    if (BUILDER.rubberStart) {
+        var end = BUILDER.rubberEnd || {col: col, row: row};
+        var minC = Math.min(BUILDER.rubberStart.col, end.col);
+        var maxC = Math.max(BUILDER.rubberStart.col, end.col);
+        var minR = Math.min(BUILDER.rubberStart.row, end.row);
+        var maxR = Math.max(BUILDER.rubberStart.row, end.row);
+        var isRealDrag = (maxC - minC + maxR - minR) > 0;
+        if (isRealDrag) {
+            if (!e.shiftKey) BUILDER.selKeys.clear();
+            for (var r = minR; r <= maxR; r++) {
+                for (var c = minC; c <= maxC; c++) {
+                    var rk = c + ',' + r;
+                    if (GRID.cells[rk]) BUILDER.selKeys.add(rk);
+                }
+            }
+            BUILDER.selKey = BUILDER.selKeys.size > 0 ? Array.from(BUILDER.selKeys)[BUILDER.selKeys.size - 1] : null;
+            BUILDER.dragMoved = true; // suppress click handler
+            gbClearRubberBand();
+            gbRenderAll();
+            gbUpdateProps();
+            if (BUILDER.selKeys.size > 0) gbFeedback(BUILDER.selKeys.size + ' zone(s) selected', 'ok');
+        } else {
+            gbClearRubberBand();
+        }
+        return;
+    }
+
+    // Drag completion
+    if (!BUILDER.dragFrom) return;
+    gbClearDragGhosts();
+    var k = col + ',' + row;
+    if (k !== BUILDER.dragFrom) {
+        gbSaveUndo();
+        if (BUILDER.selKeys.size > 1 && BUILDER.selKeys.has(BUILDER.dragFrom)) {
+            // Multi-drag: move all selected by delta
+            var fp = BUILDER.dragFrom.split(',');
+            var dx = col - (+fp[0]), dy = row - (+fp[1]);
+            if (gbMoveMulti(dx, dy)) {
+                gbFeedback('Moved ' + BUILDER.selKeys.size + ' zones', 'ok');
+            } else {
+                gbFeedback('Cannot move there (blocked or out of bounds)', 'error');
+            }
+        } else {
+            gbMoveZone(BUILDER.dragFrom, k);
+        }
+        BUILDER.dragMoved = true;
+    } else {
+        // Clicked without moving — select the zone
+        gbSelectCell(BUILDER.dragFrom, e.shiftKey);
+    }
+    BUILDER.dragFrom = null;
+    BUILDER.ghostKey = null;
+}
+
+function gbMoveZone(fromKey, toKey) {
+    var fromCell = GRID.cells[fromKey];
+    var toCell = GRID.cells[toKey];
+    if (!fromCell) return;
+
+    var fp = fromKey.split(','), tp = toKey.split(',');
+    var fc = +fp[0], fr = +fp[1], tc = +tp[0], tr = +tp[1];
+
+    if (toCell) {
+        // Swap positions
+        fromCell.col = tc; fromCell.row = tr;
+        toCell.col = fc; toCell.row = fr;
+        GRID.cells[toKey] = fromCell;
+        GRID.cells[fromKey] = toCell;
+        // Re-wire both zones and their neighbors
+        gbReWireZone(toKey);
+        gbReWireZone(fromKey);
+        gbReWireNeighbors(toKey);
+        gbReWireNeighbors(fromKey);
+    } else {
+        // Move to empty cell
+        fromCell.col = tc; fromCell.row = tr;
+        GRID.cells[toKey] = fromCell;
+        delete GRID.cells[fromKey];
+        // Re-wire the moved zone and neighbors of both old and new positions
+        gbReWireZone(toKey);
+        gbReWireNeighbors(toKey);
+        gbReWireNeighbors(fromKey);
+    }
+
+    // Always select the dragged zone at its new position
+    BUILDER.selKeys.delete(fromKey);
+    BUILDER.selKeys.add(toKey);
+    BUILDER.selKey = toKey;
+
+    gbRenderAll();
+    gbUpdateProps();
+    gbFeedback('Moved "' + fromCell.zoneId + '" to (' + tc + ',' + tr + ')' + (toCell ? ' (swapped with "' + toCell.zoneId + '")' : ''), 'ok');
+}
+
+function gbReWireZone(key) {
+    // Re-evaluate a zone's sDownstream based on what it now faces
+    var cell = GRID.cells[key];
+    if (!cell) return;
+    var fwd = DIRS[cell.direction];
+    if (!fwd) return;
+    var fwdKey = (cell.col + fwd.dx) + ',' + (cell.row + fwd.dy);
+    var fwdCell = GRID.cells[fwdKey];
+
+    // If current downstream no longer exists or is no longer in the faced cell, clear and re-wire
+    if (cell.sDownstream) {
+        var dsKey = gbFindKeyById(cell.sDownstream);
+        if (dsKey !== fwdKey) {
+            // Downstream is not in the cell we're facing — clear it
+            cell.sDownstream = null;
+        }
+    }
+    // Auto-wire to whatever is now in front
+    if (!cell.sDownstream && fwdCell) {
+        cell.sDownstream = fwdCell.zoneId;
+    }
+
+    // Branch divert: re-evaluate perpendicular
+    if (cell.zoneType === 'branch') {
+        var divDir = rotR(cell.direction);
+        var divFwd = DIRS[divDir];
+        var divKey = (cell.col + divFwd.dx) + ',' + (cell.row + divFwd.dy);
+        var divCell = GRID.cells[divKey];
+        if (cell.sDivertDownstream) {
+            var ddKey = gbFindKeyById(cell.sDivertDownstream);
+            if (ddKey !== divKey) cell.sDivertDownstream = null;
+        }
+        if (!cell.sDivertDownstream && divCell) {
+            cell.sDivertDownstream = divCell.zoneId;
+        }
+    }
+
+    // Merge input-2: re-evaluate perpendicular (left of direction)
+    if (cell.zoneType === 'merge') {
+        var in2Dir = rotL(cell.direction);
+        var in2Fwd = DIRS[in2Dir];
+        var in2Key = (cell.col + in2Fwd.dx) + ',' + (cell.row + in2Fwd.dy);
+        var in2Cell = GRID.cells[in2Key];
+        if (cell.sUpstream2) {
+            var u2Key = gbFindKeyById(cell.sUpstream2);
+            if (u2Key !== in2Key) cell.sUpstream2 = null;
+        }
+        if (!cell.sUpstream2 && in2Cell) {
+            cell.sUpstream2 = in2Cell.zoneId;
+        }
+    }
+}
+
+function gbReWireNeighbors(key) {
+    // Check all 4 neighbors of a position — if they point at this cell, wire them
+    var p = key.split(',');
+    var col = +p[0], row = +p[1];
+    var cell = GRID.cells[key]; // may be null if cell was moved away
+    var allDirs = ['N','S','E','W'];
+    for (var i = 0; i < 4; i++) {
+        var dd = DIRS[allDirs[i]];
+        var adjC = col + dd.dx, adjR = row + dd.dy;
+        var adjKey = adjC + ',' + adjR;
+        var adj = GRID.cells[adjKey];
+        if (!adj) continue;
+        // Does adj's primary direction point at this position?
+        var adjFwd = DIRS[adj.direction];
+        if (adjFwd && adj.col + adjFwd.dx === col && adj.row + adjFwd.dy === row) {
+            if (cell && !adj.sDownstream) {
+                adj.sDownstream = cell.zoneId;
+            } else if (!cell && adj.sDownstream) {
+                var dsKey = gbFindKeyById(adj.sDownstream);
+                if (!dsKey) adj.sDownstream = null;
+            }
+        }
+        // Does adj's branch divert direction point at this position?
+        if (adj.zoneType === 'branch') {
+            var adjDivDir = rotR(adj.direction);
+            var adjDivFwd = DIRS[adjDivDir];
+            if (adjDivFwd && adj.col + adjDivFwd.dx === col && adj.row + adjDivFwd.dy === row) {
+                if (cell && !adj.sDivertDownstream) {
+                    adj.sDivertDownstream = cell.zoneId;
+                } else if (!cell && adj.sDivertDownstream) {
+                    var ddKey = gbFindKeyById(adj.sDivertDownstream);
+                    if (!ddKey) adj.sDivertDownstream = null;
+                }
+            }
+        }
+        // Does adj's merge input-2 direction point at this position?
+        if (adj.zoneType === 'merge') {
+            var adjIn2Dir = rotL(adj.direction);
+            var adjIn2Fwd = DIRS[adjIn2Dir];
+            if (adjIn2Fwd && adj.col + adjIn2Fwd.dx === col && adj.row + adjIn2Fwd.dy === row) {
+                if (cell && !adj.sUpstream2) {
+                    adj.sUpstream2 = cell.zoneId;
+                } else if (!cell && adj.sUpstream2) {
+                    var u2Key = gbFindKeyById(adj.sUpstream2);
+                    if (!u2Key) adj.sUpstream2 = null;
+                }
+            }
+        }
+    }
+}
+
+function gbFindKeyById(zoneId) {
+    // Find grid key for a zone ID
+    for (var k in GRID.cells) {
+        if (GRID.cells[k].zoneId === zoneId) return k;
+    }
+    return null;
+}
+
+// ── Build Divert (from Branch) ───────────────────────────────────────
+function gbBuildDivert() {
+    if (!BUILDER.selKey) return;
+    var cell = GRID.cells[BUILDER.selKey];
+    if (!cell || cell.zoneType !== 'branch') return;
+    var divertDir = rotR(cell.direction);
+    var spurTrack = 'spur_' + (cell.iTargetChute || BUILDER.chuteN);
+    BUILDER.prevTrack = BUILDER.track;
+    BUILDER.track = spurTrack;
+    BUILDER.dir = divertDir;
+    BUILDER.wirePort = 'divert';
+    BUILDER.lastKey = BUILDER.selKey;
+    BUILDER.placeType = 'transport';
+    gbSetDir(divertDir);
+    gbSetType('transport');
+    gbSetMode('PLACE');
+    gbUpdateTrackSel();
+    gbFeedback('Building spur "' + spurTrack + '" from ' + cell.zoneId + '. Place zones, then Esc/right-click to finish.', 'info');
+}
+
+// ── Auto-Complete (BFS Pathfinding) ──────────────────────────────────
+function gbStartAC(srcKey) {
+    if (!srcKey || !GRID.cells[srcKey]) return;
+    BUILDER.acSrc = srcKey;
+    BUILDER.mode = 'AUTOCOMPLETE';
+    BUILDER.acPaths = [];
+    document.querySelectorAll('[data-mode]').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('gbWrap').classList.add('ac-mode');
+    gbRenderAll();
+    gbFeedback('Auto-complete: hover over a target zone and click to connect. Esc to cancel.', 'info');
+}
+
+function gbExitAC() {
+    BUILDER.mode = 'SELECT';  // Set FIRST to prevent re-entry from gbSetMode
+    BUILDER.acSrc = null;
+    BUILDER.acPaths = [];
+    document.getElementById('gbWrap').classList.remove('ac-mode');
+    gbClearACPaths();
+    gbSetMode('SELECT');
+}
+
+function gbClearACPaths() {
+    BUILDER.acPaths.forEach(function(pk) {
+        var p = pk.split(',');
+        var el = document.getElementById('gc' + p[0] + '_' + p[1]);
+        if (el) el.classList.remove('ac-path');
+    });
+    // Also clear any ac-tgt highlights
+    document.querySelectorAll('.gc.ac-tgt').forEach(function(el) { el.classList.remove('ac-tgt'); });
+    BUILDER.acPaths = [];
+}
+
+function gbBFS(srcKey, tgtKey) {
+    // BFS from cells adjacent to source to cells adjacent to target, through empty cells
+    var src = GRID.cells[srcKey], tgt = GRID.cells[tgtKey];
+    if (!src || !tgt) return null;
+
+    // Start positions: empty cells adjacent to source
+    var starts = [];
+    var dirKeys = ['N','S','E','W'];
+    for (var i = 0; i < 4; i++) {
+        var d = DIRS[dirKeys[i]];
+        var nc = src.col + d.dx, nr = src.row + d.dy;
+        var nk = nc + ',' + nr;
+        if (nc >= 0 && nc < GB_C && nr >= 0 && nr < GB_R && !GRID.cells[nk]) {
+            starts.push({ key: nk, dir: dirKeys[i] });
+        }
+    }
+    // Goal: empty cell adjacent to target
+    var goals = {};
+    for (var i = 0; i < 4; i++) {
+        var d = DIRS[dirKeys[i]];
+        var nc = tgt.col + d.dx, nr = tgt.row + d.dy;
+        var nk = nc + ',' + nr;
+        if (nc >= 0 && nc < GB_C && nr >= 0 && nr < GB_R && !GRID.cells[nk]) {
+            goals[nk] = dirKeys[i];
+        }
+    }
+
+    // BFS
+    var visited = {};
+    var queue = [];
+    for (var s = 0; s < starts.length; s++) {
+        visited[starts[s].key] = null; // parent = null (start)
+        queue.push(starts[s].key);
+    }
+
+    while (queue.length > 0) {
+        var cur = queue.shift();
+        if (goals[cur] !== undefined) {
+            // Reconstruct path
+            var path = [];
+            var node = cur;
+            while (node !== null) {
+                path.unshift(node);
+                node = visited[node];
+            }
+            return path;
+        }
+        var cp = cur.split(',');
+        var cc = +cp[0], cr = +cp[1];
+        for (var i = 0; i < 4; i++) {
+            var d = DIRS[dirKeys[i]];
+            var nc = cc + d.dx, nr = cr + d.dy;
+            var nk = nc + ',' + nr;
+            if (nc >= 0 && nc < GB_C && nr >= 0 && nr < GB_R && !visited.hasOwnProperty(nk) && !GRID.cells[nk]) {
+                visited[nk] = cur;
+                queue.push(nk);
+            }
+        }
+    }
+    return null; // No path found
+}
+
+function gbExecAC(tgtKey) {
+    var srcCell = GRID.cells[BUILDER.acSrc];
+    var tgtCell = GRID.cells[tgtKey];
+    if (!srcCell || !tgtCell) return;
+
+    // Helper: detect if a cell (tc,tr) is in the source branch's divert direction
+    function isDivertDir(src, tc, tr) {
+        if (src.zoneType !== 'branch') return false;
+        var dd = DIRS[rotR(src.direction)];
+        return dd && src.col + dd.dx === tc && src.row + dd.dy === tr;
+    }
+
+    // Direct wire if source and target are adjacent (no path needed)
+    var dist = Math.abs(srcCell.col - tgtCell.col) + Math.abs(srcCell.row - tgtCell.row);
+    if (dist === 1) {
+        if (isDivertDir(srcCell, tgtCell.col, tgtCell.row)) {
+            srcCell.sDivertDownstream = tgtCell.zoneId;
+        } else {
+            srcCell.sDownstream = tgtCell.zoneId;
+        }
+        gbExitAC();
+        gbRenderAll();
+        gbFeedback('Direct-wired ' + srcCell.zoneId + ' → ' + tgtCell.zoneId, 'ok');
+        return;
+    }
+
+    var path = gbBFS(BUILDER.acSrc, tgtKey);
+    if (!path || path.length === 0) {
+        gbFeedback('No path found!', 'error');
+        return;
+    }
+    var track = srcCell.trackGroup;
+
+    // Place transport zones along path
+    var prevId = srcCell.zoneId;
+    for (var i = 0; i < path.length; i++) {
+        var pk = path[i];
+        var pp = pk.split(',');
+        var pc = +pp[0], pr = +pp[1];
+        // Determine direction from previous cell to this cell
+        var dir = 'E';
+        if (i === 0) {
+            dir = gbDirBetween(srcCell.col, srcCell.row, pc, pr);
+        } else {
+            var prevP = path[i-1].split(',');
+            dir = gbDirBetween(+prevP[0], +prevP[1], pc, pr);
+        }
+        var zoneId = gbGenId('transport', track);
+        GRID.cells[pk] = {
+            col: pc, row: pr, zoneId: zoneId, zoneType: 'transport', direction: dir,
+            trackGroup: track,
+            sDownstream: null, sDivertDownstream: null, sUpstream2: null,
+            iTargetChute: null, eMergePriority: null,
+            bIsSpawnPoint: false, bIsPickupPoint: false, bForceRelease: false,
+            rLength_cm: null, rGap_cm: null, rWidth_cm: null,
+            rSensorOffset_cm: null, rMaxSpeed: null,
+            sSpawnList: null, eSpawnTrigger: null,
+            ePickupMode: null, rPickupRate_s: null, rPickupRandom: null,
+        };
+        // Wire previous to this
+        if (i === 0) {
+            // Wire source cell to first path zone (check branch divert)
+            if (isDivertDir(srcCell, pc, pr)) {
+                srcCell.sDivertDownstream = zoneId;
+            } else {
+                srcCell.sDownstream = zoneId;
+            }
+        } else {
+            GRID.cells[path[i-1]].sDownstream = zoneId;
+        }
+        prevId = zoneId;
+    }
+    // Wire last path zone to target
+    GRID.cells[path[path.length-1]].sDownstream = tgtCell.zoneId;
+
+    gbExitAC();
+    gbRenderAll();
+    gbFeedback('Auto-completed: placed ' + path.length + ' transport zones.', 'ok');
+}
+
+function gbDirBetween(c1, r1, c2, r2) {
+    var dx = c2 - c1, dy = r2 - r1;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'E' : 'W';
+    return dy >= 0 ? 'S' : 'N';
+}
+
+// ── Export (Grid -> Descriptors) ─────────────────────────────────────
+function gbExport() {
+    var descriptors = [];
+    for (var k in GRID.cells) {
+        var c = GRID.cells[k];
+        var eType = c.zoneType;
+        // Map builder types to PLC-compatible descriptor types
+        if (eType === 'spawn') eType = 'infeed';
+        else if (eType === 'pickup') eType = 'transport';
+        else if (eType === 'jump') eType = 'end';
+
+        var d = { sZoneID: c.zoneId, eZoneType: eType, sTrackGroup: c.trackGroup };
+        if (c.sDownstream) d.sDownstream = c.sDownstream;
+        if (c.sDivertDownstream) d.sDivertDownstream = c.sDivertDownstream;
+        // sUpstream2 no longer exported — compiler infers merge inputs from topology
+        if (c.iTargetChute != null) d.iTargetChute = c.iTargetChute;
+        if (c.eMergePriority) d.eMergePriority = c.eMergePriority;
+        if (c.bIsSpawnPoint) d.bIsSpawnPoint = true;
+        if (c.bIsPickupPoint) d.bIsPickupPoint = true;
+        if (c.bForceRelease) d.bForceRelease = true;
+        if (c.rLength_cm != null) d.rLength_cm = c.rLength_cm;
+        if (c.rGap_cm != null) d.rGap_cm = c.rGap_cm;
+        if (c.rWidth_cm != null) d.rWidth_cm = c.rWidth_cm;
+        if (c.rSensorOffset_cm != null) d.rSensorOffset_cm = c.rSensorOffset_cm;
+        if (c.rMaxSpeed != null) d.rMaxSpeed = c.rMaxSpeed;
+        // Spawn config
+        if (c.sSpawnList) d.sSpawnList = c.sSpawnList;
+        if (c.eSpawnTrigger) d.eSpawnTrigger = c.eSpawnTrigger;
+        // Pickup config
+        if (c.ePickupMode) d.ePickupMode = c.ePickupMode;
+        if (c.rPickupRate_s != null) d.rPickupRate_s = c.rPickupRate_s;
+        if (c.rPickupRandom != null) d.rPickupRandom = c.rPickupRandom;
+        descriptors.push(d);
+    }
+    return descriptors;
+}
+
+// ── Import (Descriptors -> Grid) ─────────────────────────────────────
+function gbImport(descriptors) {
+    gbClearSilent();
+    BUILDER.ids = {};
+    BUILDER.chuteN = 1;
+
+    // Build lookup
+    var byId = {};
+    var trackZones = {};
+    descriptors.forEach(function(d) {
+        byId[d.sZoneID] = d;
+        var track = d.sTrackGroup || 'main';
+        if (!trackZones[track]) trackZones[track] = [];
+        trackZones[track].push(d);
+    });
+
+    // Order tracks: main first, then spurs, recirc, reinduct, reject
+    var tracks = Object.keys(trackZones).sort(function(a, b) {
+        function pri(t) {
+            if (t === 'main') return 0;
+            if (t.startsWith('spur_')) return 1;
+            if (t === 'reject') return 2;
+            if (t === 'recirc') return 3;
+            if (t === 'reinduct') return 4;
+            return 5;
+        }
+        return pri(a) - pri(b);
+    });
+
+    var curRow = 1;
+    tracks.forEach(function(track) {
+        var zones = trackZones[track];
+        // Find head zones (not downstream of anyone in same track)
+        var downstreams = {};
+        zones.forEach(function(z) {
+            if (z.sDownstream && byId[z.sDownstream] && (byId[z.sDownstream].sTrackGroup || 'main') === track)
+                downstreams[z.sDownstream] = true;
+        });
+        var heads = zones.filter(function(z) { return !downstreams[z.sZoneID]; });
+        if (heads.length === 0) heads = [zones[0]];
+
+        heads.forEach(function(head) {
+            var col = 2;
+            var cur = head;
+            var visited = {};
+            while (cur && col < GB_C - 1 && !visited[cur.sZoneID]) {
+                visited[cur.sZoneID] = true;
+                var gType = cur.eZoneType;
+                // Map PLC descriptor types to builder types
+                if (gType === 'infeed' || (gType === 'infeed' && cur.bIsSpawnPoint)) gType = 'spawn';
+                else if (gType === 'transport' && cur.bIsPickupPoint) gType = 'pickup';
+                else if (gType === 'end') gType = 'jump';
+
+                var k = col + ',' + curRow;
+                GRID.cells[k] = {
+                    col: col, row: curRow, zoneId: cur.sZoneID, zoneType: gType,
+                    direction: 'E', trackGroup: track,
+                    sDownstream: cur.sDownstream != null ? cur.sDownstream : null,
+                    sDivertDownstream: cur.sDivertDownstream != null ? cur.sDivertDownstream : null,
+                    sUpstream2: cur.sUpstream2 != null ? cur.sUpstream2 : null,
+                    iTargetChute: cur.iTargetChute != null ? cur.iTargetChute : null,
+                    eMergePriority: cur.eMergePriority != null ? cur.eMergePriority : null,
+                    bIsSpawnPoint: !!cur.bIsSpawnPoint,
+                    bIsPickupPoint: !!cur.bIsPickupPoint,
+                    bForceRelease: !!cur.bForceRelease,
+                    rLength_cm: cur.rLength_cm != null ? cur.rLength_cm : null,
+                    rGap_cm: cur.rGap_cm != null ? cur.rGap_cm : null,
+                    rWidth_cm: cur.rWidth_cm != null ? cur.rWidth_cm : null,
+                    rSensorOffset_cm: cur.rSensorOffset_cm != null ? cur.rSensorOffset_cm : null,
+                    rMaxSpeed: cur.rMaxSpeed != null ? cur.rMaxSpeed : null,
+                    // Spawn config
+                    sSpawnList: cur.sSpawnList || (gType === 'spawn' ? 'default' : null),
+                    eSpawnTrigger: cur.eSpawnTrigger || (gType === 'spawn' ? 'backpressure' : null),
+                    // Pickup config
+                    ePickupMode: cur.ePickupMode || (gType === 'pickup' ? 'auto' : null),
+                    rPickupRate_s: cur.rPickupRate_s != null ? cur.rPickupRate_s : (gType === 'pickup' ? 5.0 : null),
+                    rPickupRandom: cur.rPickupRandom != null ? cur.rPickupRandom : (gType === 'pickup' ? 0.0 : null),
+                };
+                // Track highest chute number
+                if (cur.iTargetChute && cur.iTargetChute >= BUILDER.chuteN)
+                    BUILDER.chuteN = cur.iTargetChute + 1;
+
+                col++;
+                // Follow downstream within same track
+                var nextId = cur.sDownstream;
+                if (nextId && byId[nextId] && (byId[nextId].sTrackGroup || 'main') === track) {
+                    cur = byId[nextId];
+                } else {
+                    cur = null;
+                }
+            }
+            curRow += 2;
+        });
+    });
+
+    // Rebuild BUILDER.ids counters from imported zone IDs
+    gbRebuildIds();
+
+    gbRenderAll();
+    gbUpdateTrackSel();
+    gbFeedback('Imported ' + descriptors.length + ' zones onto grid.', 'ok');
+}
+
+function gbRebuildIds() {
+    // Robust counter rebuild: for each prefix used by gbGenId,
+    // find the highest trailing number among all zone IDs that match.
+    // Also counts non-numbered matches (e.g., MERGE_RECIRC counts as 1 MERGE).
+    BUILDER.ids = {};
+    var allIds = [];
+    for (var k in GRID.cells) allIds.push(GRID.cells[k].zoneId);
+
+    // Helper: scan all IDs for a prefix pattern, return max trailing number found
+    function maxN(prefix, counter) {
+        var max = 0;
+        for (var i = 0; i < allIds.length; i++) {
+            if (allIds[i].indexOf(prefix) === 0) {
+                var suffix = allIds[i].slice(prefix.length);
+                var n = parseInt(suffix);
+                if (!isNaN(n) && n > max) max = n;
+                else if (max === 0) max = 1; // At least 1 exists with this prefix
+            }
+        }
+        if (max > 0) BUILDER.ids[counter] = Math.max(BUILDER.ids[counter]||0, max);
+    }
+
+    // Core prefixes from gbGenId
+    maxN('C_', 'C');                    // Main transport: C_1, C_2, ...
+    maxN('C_RC_', 'C_RC');              // Recirc transport: C_RC_1, ...
+    maxN('C_RI_', 'C_RI');              // Reinduct transport: C_RI_1, ...
+    maxN('REJECT_', 'REJECT');          // Reject: REJECT_1, ...
+    maxN('SCANNER', 'SCN');             // Scanner: SCANNER, SCANNER_2, ...
+    maxN('BRANCH_', 'BR');              // Branch: BRANCH_1, ...
+    maxN('MERGE_', 'MR');               // Merge: MERGE_MAIN, MERGE_2, MERGE_RECIRC, ...
+    maxN('JUMP_', 'JMP');               // Jump: JUMP_1, ...
+    maxN('PICKUP_', 'PK');              // Pickup: PICKUP_1, ...
+    maxN('SPAWN_', 'SP');               // Spawn: SPAWN_1, SPAWN_2, ...
+
+    // Legacy support: INFEED/REINDUCT/END_ IDs from old topologies
+    for (var i = 0; i < allIds.length; i++) {
+        if (allIds[i] === 'INFEED' || allIds[i] === 'REINDUCT' || allIds[i].indexOf('SPAWN_') === 0) {
+            var n = allIds[i] === 'INFEED' ? 1 : allIds[i] === 'REINDUCT' ? 2 : parseInt(allIds[i].slice(6));
+            if (!isNaN(n)) BUILDER.ids.SP = Math.max(BUILDER.ids.SP||0, n);
+        }
+        if (allIds[i].indexOf('END_') === 0) {
+            var n2 = parseInt(allIds[i].slice(4));
+            if (!isNaN(n2)) BUILDER.ids.JMP = Math.max(BUILDER.ids.JMP||0, n2);
+        }
+    }
+
+    // Spur transport counters: C_S{N}_{M} pattern
+    for (var i = 0; i < allIds.length; i++) {
+        var m = allIds[i].match(/^C_S(\d+)_(\d+)/);
+        if (m) {
+            var counter = 'C_S' + m[1];
+            BUILDER.ids[counter] = Math.max(BUILDER.ids[counter]||0, +m[2]);
+        }
+        // Also handle SPUR_N_M patterns from existing topologies
+        m = allIds[i].match(/^SPUR_(\d+)_(\d+)/);
+        if (m) {
+            var counter = 'C_S' + m[1];
+            BUILDER.ids[counter] = Math.max(BUILDER.ids[counter]||0, +m[2]);
+        }
+    }
+
+    // Handle non-standard C-prefixed IDs (C1, C2, C_BUF_1, C_POST_LAST, etc.)
+    // Count how many zone IDs start with 'C' that aren't covered by specific prefixes
+    var cCount = 0;
+    for (var i = 0; i < allIds.length; i++) {
+        var zid = allIds[i];
+        if (zid.charAt(0) === 'C' && zid.charAt(1) !== '_' || // C1, C2, C3_SCAN, etc.
+            (zid.indexOf('C_') === 0 && !zid.match(/^C_(RC|RI|S\d|POST|BUF|RECIRC)/))) {
+            cCount++;
+        }
+    }
+    BUILDER.ids.C = Math.max(BUILDER.ids.C||0, cCount);
+}
+
+// ── Compile / Apply / Save / Load ────────────────────────────────────
+async function gbCompile() {
+    var descriptors = gbExport();
+    if (descriptors.length === 0) {
+        gbFeedback('No zones on grid to compile.', 'error');
+        return;
+    }
+    try {
+        gbFeedback('Compiling...', 'info');
+        var resp = await fetch('/api/topology/compile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ descriptors: descriptors }),
+        });
+        var data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        gbFeedback('Compiled OK: ' + data.zone_count + ' zones, ' + data.tracks.length + ' tracks (' + data.tracks.join(', ') + ')', 'ok');
+    } catch (e) {
+        gbFeedback('Compile failed: ' + e.message, 'error');
+    }
+}
+
+async function gbApply() {
+    var descriptors = gbExport();
+    if (descriptors.length === 0) { gbFeedback('No zones to apply.', 'error'); return; }
+    if (!confirm('Apply this topology? The PLC will restart with a fresh state.')) return;
+    try {
+        gbFeedback('Applying...', 'info');
+        var resp = await fetch('/api/topology/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ descriptors: descriptors }),
+        });
+        var data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        gbFeedback('Applied! ' + data.zone_count + ' zones, tracks: ' + data.tracks.join(', '), 'ok');
+        // Refresh PLC tab
+        setTimeout(async function() {
+            try {
+                var r2 = await fetch('/api/topology');
+                topology = await r2.json();
+                buildLayout();
+                buildPickupToggles();
+            } catch(e) {}
+        }, 1000);
+    } catch (e) {
+        gbFeedback('Apply failed: ' + e.message, 'error');
+    }
+}
+
+async function gbSave() {
+    var descriptors = gbExport();
+    if (descriptors.length === 0) { gbFeedback('No zones to save.', 'error'); return; }
+    try {
+        gbFeedback('Saving...', 'info');
+        // Save PLC descriptors
+        var resp = await fetch('/api/topology/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ descriptors: descriptors }),
+        });
+        var data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        // Save builder grid layout (positions, directions, visual arrangement)
+        var cells = {};
+        for (var k in GRID.cells) cells[k] = GRID.cells[k];
+        await fetch('/api/builder/layout/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cells: cells }),
+        });
+        gbFeedback('Saved ' + data.zone_count + ' zones (topology + layout)', 'ok');
+    } catch (e) {
+        gbFeedback('Save failed: ' + e.message, 'error');
+    }
+}
+
+async function gbLoadFile() {
+    if (!confirm('Load saved layout? This will also apply it to the PLC (fresh restart).')) return;
+    try {
+        gbFeedback('Loading...', 'info');
+        // Try loading saved grid layout first
+        var layoutResp = await fetch('/api/builder/layout/load');
+        var layoutData = await layoutResp.json();
+        if (layoutData.cells) {
+            // Load from PLC (applies topology)
+            var resp = await fetch('/api/topology/load', { method: 'POST' });
+            var data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            // Restore saved grid layout instead of auto-layout
+            gbClearSilent();
+            BUILDER.ids = {};
+            BUILDER.chuteN = 1;
+            GRID.cells = layoutData.cells;
+            gbRebuildIds();
+            gbRenderAll();
+            gbUpdateTrackSel();
+            gbFeedback('Loaded ' + Object.keys(GRID.cells).length + ' zones from saved layout', 'ok');
+        } else {
+            // No saved layout — fall back to descriptor import
+            var resp = await fetch('/api/topology/load', { method: 'POST' });
+            var data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            gbImport(data.descriptors);
+        }
+        // Refresh PLC tab
+        setTimeout(async function() {
+            try {
+                var r2 = await fetch('/api/topology');
+                topology = await r2.json();
+                buildLayout();
+                buildPickupToggles();
+            } catch(e) {}
+        }, 1000);
+    } catch (e) {
+        gbFeedback('Load failed: ' + e.message, 'error');
+    }
+}
+
+async function gbLoadCurrent() {
+    try {
+        gbFeedback('Loading...', 'info');
+        // Try saved grid layout first (preserves visual arrangement)
+        var layoutResp = await fetch('/api/builder/layout/load');
+        var layoutData = await layoutResp.json();
+        if (layoutData.cells && Object.keys(layoutData.cells).length > 0) {
+            gbClearSilent();
+            BUILDER.ids = {};
+            BUILDER.chuteN = 1;
+            GRID.cells = layoutData.cells;
+            gbRebuildIds();
+            gbRenderAll();
+            gbUpdateTrackSel();
+            gbFeedback('Loaded ' + Object.keys(GRID.cells).length + ' zones from saved layout', 'ok');
+        } else {
+            // No saved layout — import from running PLC descriptors
+            var resp = await fetch('/api/topology/descriptors');
+            var descriptors = await resp.json();
+            gbImport(descriptors);
+        }
+    } catch (e) {
+        gbFeedback('Failed to load: ' + e.message, 'error');
+    }
+}
+
+// ── Undo / Clear ─────────────────────────────────────────────────────
+function gbSaveUndo() {
+    // Deep copy cells
+    var snap = {};
+    for (var k in GRID.cells) {
+        snap[k] = Object.assign({}, GRID.cells[k]);
+    }
+    BUILDER.undoStack.push(snap);
+    if (BUILDER.undoStack.length > 50) BUILDER.undoStack.shift();
+}
+
+function gbUndo() {
+    if (BUILDER.undoStack.length === 0) { gbFeedback('Nothing to undo.', 'info'); return; }
+    GRID.cells = BUILDER.undoStack.pop();
+    BUILDER.selKey = null;
+    BUILDER.selKeys.clear();
+    BUILDER.lastKey = null;
+    gbRenderAll();
+    gbUpdateProps();
+    gbUpdateTrackSel();
+    gbFeedback('Undone.', 'info');
+}
+
+function gbClearSilent() {
+    GRID.cells = {};
+    BUILDER.selKey = null;
+    BUILDER.selKeys.clear();
+    BUILDER.lastKey = null;
+    BUILDER.ghostKey = null;
+    BUILDER.acSrc = null;
+    BUILDER.acPaths = [];
+}
+
+function gbClear() {
+    if (Object.keys(GRID.cells).length > 0 && !confirm('Clear all zones from grid?')) return;
+    gbSaveUndo();
+    gbClearSilent();
+    BUILDER.ids = {};
+    BUILDER.chuteN = 1;
+    gbRenderAll();
+    gbUpdateProps();
+    gbUpdateTrackSel();
+    gbFeedback('Grid cleared.', 'info');
+}
+
+// ── Track Selector ───────────────────────────────────────────────────
+function gbUpdateTrackSel() {
+    var sel = document.getElementById('gbTrack');
+    if (!sel) return;
+    var tracks = { main: true };
+    for (var k in GRID.cells) tracks[GRID.cells[k].trackGroup] = true;
+    // Always include common tracks
+    ['main','recirc','reinduct','reject'].forEach(function(t) { tracks[t] = true; });
+
+    var cur = BUILDER.track;
+    sel.innerHTML = '';
+    Object.keys(tracks).sort().forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === cur) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Add current track if not in list
+    if (!tracks[cur]) {
+        var opt = document.createElement('option');
+        opt.value = cur;
+        opt.textContent = cur;
+        opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+// ── Keyboard Shortcuts ───────────────────────────────────────────────
+function gbKeyHandler(e) {
+    if (activeTab !== 'builder') return;
+    // Don't capture when typing in input/select
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    // Let Ctrl/Cmd combos pass through except our handled ones
+    var lk = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && lk !== 'z' && lk !== 'c' && lk !== 'v') return;
+
+    switch (e.key) {
+        case 'p': case 'P':
+            if (!e.ctrlKey && !e.metaKey) { gbSetMode('PLACE'); e.preventDefault(); }
+            break;
+        case 's': case 'S':
+            if (!e.ctrlKey && !e.metaKey) { gbSetMode('SELECT'); e.preventDefault(); }
+            break;
+        case 'x': case 'X':
+            if (!e.ctrlKey && !e.metaKey) { gbSetMode('DELETE'); e.preventDefault(); }
+            break;
+        case 'Escape':
+            if (BUILDER.mode === 'AUTOCOMPLETE') gbExitAC();
+            else gbSetMode('SELECT');
+            e.preventDefault(); break;
+        case 'ArrowUp': gbSetDir('N'); e.preventDefault(); break;
+        case 'ArrowDown': gbSetDir('S'); e.preventDefault(); break;
+        case 'ArrowLeft': gbSetDir('W'); e.preventDefault(); break;
+        case 'ArrowRight': gbSetDir('E'); e.preventDefault(); break;
+        case 'e': case 'E': gbRotate(1); e.preventDefault(); break;
+        case 'q': case 'Q': gbRotate(-1); e.preventDefault(); break;
+        case 'Delete': case 'Backspace':
+            if (BUILDER.selKeys.size > 0) {
+                gbSaveUndo();
+                var delKeys = Array.from(BUILDER.selKeys);
+                delKeys.forEach(function(dk) { gbDeleteCell(dk); });
+                BUILDER.selKeys.clear();
+                BUILDER.selKey = null;
+                gbUpdateProps();
+                gbFeedback('Deleted ' + delKeys.length + ' zone(s)', 'info');
+            }
+            e.preventDefault(); break;
+        case 'c': case 'C':
+            if ((e.ctrlKey || e.metaKey) && BUILDER.selKeys.size > 0) {
+                // Copy primary selected zone (for single-zone paste)
+                var src = GRID.cells[BUILDER.selKey];
+                if (src) {
+                    BUILDER.clipboard = {
+                        zoneType: src.zoneType, direction: src.direction,
+                        trackGroup: src.trackGroup, iTargetChute: src.iTargetChute,
+                        eMergePriority: src.eMergePriority, bIsSpawnPoint: src.bIsSpawnPoint,
+                        bIsPickupPoint: src.bIsPickupPoint, bForceRelease: src.bForceRelease,
+                        rLength_cm: src.rLength_cm, rGap_cm: src.rGap_cm,
+                        rWidth_cm: src.rWidth_cm, rSensorOffset_cm: src.rSensorOffset_cm,
+                        rMaxSpeed: src.rMaxSpeed,
+                        sSpawnList: src.sSpawnList, eSpawnTrigger: src.eSpawnTrigger,
+                        ePickupMode: src.ePickupMode, rPickupRate_s: src.rPickupRate_s,
+                        rPickupRandom: src.rPickupRandom,
+                    };
+                    var n = BUILDER.selKeys.size;
+                    gbFeedback('Copied ' + (n > 1 ? n + ' zones (paste uses primary: ' + src.zoneId + ')' : src.zoneId + ' (' + (ZT[src.zoneType]||ZT.transport).name + ')'), 'ok');
+                }
+                e.preventDefault();
+            }
+            break;
+        case 'v': case 'V':
+            if ((e.ctrlKey || e.metaKey) && BUILDER.clipboard) {
+                BUILDER.placeType = BUILDER.clipboard.zoneType;
+                BUILDER.dir = BUILDER.clipboard.direction;
+                gbSetMode('PLACE');
+                gbFeedback('Paste mode — click to place. Esc to cancel.', 'info');
+                e.preventDefault();
+            }
+            break;
+        case 'z': case 'Z':
+            if (e.ctrlKey || e.metaKey) { gbUndo(); e.preventDefault(); }
+            break;
+        case '1': gbSetType('transport'); break;
+        case '2': gbSetType('scanner'); break;
+        case '3': gbSetType('branch'); break;
+        case '4': gbSetType('merge'); break;
+        case '5': gbSetType('jump'); break;
+        case '6': gbSetType('spawn'); break;
+        case '7': gbSetType('pickup'); break;
+    }
+}
+
+// ── Radial Menu (right-click hold) ──────────────────────────────────
+var RADIAL_ITEMS = [
+    {type:'transport',name:'Transport'},{type:'scanner',name:'Scanner'},
+    {type:'branch',name:'Branch'},{type:'merge',name:'Merge'},
+    {type:'jump',name:'Jump'},{type:'spawn',name:'Spawn'},
+    {type:'pickup',name:'Pickup'},{type:'_delete',name:'Delete'},
+];
+var radialEl=null, radialVisible=false, radialCx=0, radialCy=0, radialActive=-1;
+var RAD_N=8, RAD_OR=80, RAD_IR=25;
+
+function gbInitRadial() {
+    var el = document.createElement('div');
+    el.style.cssText = 'display:none;position:fixed;z-index:1000;pointer-events:none;';
+    var R=RAD_OR, r=RAD_IR, pad=20, half=R+pad;
+    var s = '<svg viewBox="'+(-half)+' '+(-half)+' '+(half*2)+' '+(half*2)+'" width="'+(half*2)+'" height="'+(half*2)+'" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.6));">';
+    // Backdrop
+    s += '<circle cx="0" cy="0" r="'+(R+4)+'" fill="rgba(10,10,20,0.6)" stroke="none"/>';
+    // Segments
+    for (var i=0; i<RAD_N; i++) {
+        var a0 = (i*45 - 22.5 - 90)*Math.PI/180;
+        var a1 = (i*45 + 22.5 - 90)*Math.PI/180;
+        var d = 'M'+(r*Math.cos(a0)).toFixed(1)+','+(r*Math.sin(a0)).toFixed(1)+
+            ' L'+(R*Math.cos(a0)).toFixed(1)+','+(R*Math.sin(a0)).toFixed(1)+
+            ' A'+R+','+R+' 0 0,1 '+(R*Math.cos(a1)).toFixed(1)+','+(R*Math.sin(a1)).toFixed(1)+
+            ' L'+(r*Math.cos(a1)).toFixed(1)+','+(r*Math.sin(a1)).toFixed(1)+
+            ' A'+r+','+r+' 0 0,0 '+(r*Math.cos(a0)).toFixed(1)+','+(r*Math.sin(a0)).toFixed(1)+' Z';
+        s += '<path id="rseg'+i+'" d="'+d+'" fill="rgba(20,20,35,0.95)" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>';
+    }
+    // Center
+    s += '<circle id="rsegC" cx="0" cy="0" r="'+r+'" fill="rgba(20,20,35,0.95)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>';
+    s += '<text x="0" y="1" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.6)" font-size="9" font-family="Consolas,monospace">Select</text>';
+    // Icons + labels
+    for (var i=0; i<RAD_N; i++) {
+        var midA = (i*45 - 90)*Math.PI/180;
+        var midR = (r+R)/2;
+        var ix = midR*Math.cos(midA), iy = midR*Math.sin(midA);
+        var item = RADIAL_ITEMS[i];
+        if (item.type === '_delete') {
+            s += '<g transform="translate('+ix.toFixed(1)+','+iy.toFixed(1)+')">';
+            s += '<line x1="-5" y1="-5" x2="5" y2="5" stroke="#ff1744" stroke-width="2.5" stroke-linecap="round"/>';
+            s += '<line x1="5" y1="-5" x2="-5" y2="5" stroke="#ff1744" stroke-width="2.5" stroke-linecap="round"/>';
+            s += '</g>';
+        } else {
+            var inner = gbCellSVG(item.type, 'E').replace(/<svg[^>]*>/,'').replace(/<\/svg>/,'');
+            s += '<g transform="translate('+(ix-10).toFixed(1)+','+(iy-10).toFixed(1)+') scale(0.5)">'+inner+'</g>';
+        }
+        var lr = R+12, lx = lr*Math.cos(midA), ly = lr*Math.sin(midA);
+        s += '<text x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+'" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="7.5" font-family="Consolas,monospace">'+item.name+'</text>';
+    }
+    s += '</svg>';
+    el.innerHTML = s;
+    document.body.appendChild(el);
+    radialEl = el;
+}
+
+function gbShowRadial(mx, my) {
+    if (!radialEl) gbInitRadial();
+    var half = RAD_OR + 20;
+    radialCx = mx; radialCy = my;
+    radialEl.style.left = (mx - half) + 'px';
+    radialEl.style.top = (my - half) + 'px';
+    radialEl.style.display = 'block';
+    radialVisible = true;
+    radialActive = -1;
+    gbRadialHL(-1);
+    document._rmMove = function(e) { gbRadialMove(e.clientX, e.clientY); };
+    document._rmUp = function(e) { if (e.button === 2) gbHideRadial(); };
+    document._rmCtx = function(e) { e.preventDefault(); };
+    document.addEventListener('mousemove', document._rmMove);
+    document.addEventListener('mouseup', document._rmUp);
+    document.addEventListener('contextmenu', document._rmCtx);
+}
+
+function gbRadialMove(mx, my) {
+    var dx = mx - radialCx, dy = my - radialCy;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    var idx;
+    if (dist < RAD_IR) {
+        idx = -1;
+    } else {
+        var deg = (Math.atan2(dy,dx)*180/Math.PI + 90 + 22.5 + 360) % 360;
+        idx = Math.floor(deg / 45);
+        if (idx >= RAD_N) idx = 0;
+    }
+    if (idx !== radialActive) { radialActive = idx; gbRadialHL(idx); }
+}
+
+function gbRadialHL(idx) {
+    var dfill = 'rgba(20,20,35,0.95)';
+    for (var i=0; i<RAD_N; i++) {
+        var seg = document.getElementById('rseg'+i);
+        if (seg) seg.setAttribute('fill', dfill);
+    }
+    var ctr = document.getElementById('rsegC');
+    if (ctr) ctr.setAttribute('fill', dfill);
+    if (idx === -1) {
+        if (ctr) ctr.setAttribute('fill', 'rgba(0,120,160,0.85)');
+    } else {
+        var seg = document.getElementById('rseg'+idx);
+        if (seg) seg.setAttribute('fill', RADIAL_ITEMS[idx].type==='_delete' ? 'rgba(140,20,20,0.85)' : 'rgba(0,120,160,0.85)');
+    }
+}
+
+function gbHideRadial() {
+    if (!radialVisible) return;
+    radialEl.style.display = 'none';
+    radialVisible = false;
+    document.removeEventListener('mousemove', document._rmMove);
+    document.removeEventListener('mouseup', document._rmUp);
+    document.removeEventListener('contextmenu', document._rmCtx);
+    if (radialActive === -1) {
+        gbSetMode('SELECT');
+    } else {
+        var item = RADIAL_ITEMS[radialActive];
+        if (item.type === '_delete') {
+            gbSetMode('DELETE');
+        } else {
+            gbSetType(item.type);
+        }
+    }
+}
+
+// ── Feedback ─────────────────────────────────────────────────────────
+function gbFeedback(msg, level) {
+    var fb = document.getElementById('gbFB');
+    if (fb) {
+        fb.textContent = msg;
+        fb.className = 'builder-feedback ' + (level || 'info');
+    }
+}
+
+// ── Start ────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

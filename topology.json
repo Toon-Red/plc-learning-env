@@ -1,0 +1,221 @@
+[
+  {
+    "sZoneID": "INFEED",
+    "eZoneType": "infeed",
+    "sTrackGroup": "main",
+    "bIsSpawnPoint": true,
+    "sDownstream": "C1"
+  },
+  {
+    "sZoneID": "C1",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "MERGE_MAIN"
+  },
+  {
+    "sZoneID": "MERGE_MAIN",
+    "eZoneType": "merge",
+    "sTrackGroup": "main",
+    "eMergePriority": "INPUT2_PRIORITY",
+    "sDownstream": "C2"
+  },
+  {
+    "sZoneID": "C2",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "C3_SCAN"
+  },
+  {
+    "sZoneID": "C3_SCAN",
+    "eZoneType": "scanner",
+    "sTrackGroup": "main",
+    "sDownstream": "C4"
+  },
+  {
+    "sZoneID": "C4",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "C5"
+  },
+  {
+    "sZoneID": "C5",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "C6"
+  },
+  {
+    "sZoneID": "C6",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "BRANCH_1"
+  },
+  {
+    "sZoneID": "BRANCH_1",
+    "eZoneType": "branch",
+    "sTrackGroup": "main",
+    "iTargetChute": 1,
+    "sDownstream": "C_BUF_1",
+    "sDivertDownstream": "SPUR_1_1"
+  },
+  {
+    "sZoneID": "C_BUF_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "BRANCH_2"
+  },
+  {
+    "sZoneID": "BRANCH_2",
+    "eZoneType": "branch",
+    "sTrackGroup": "main",
+    "iTargetChute": 2,
+    "sDownstream": "C_BUF_2",
+    "sDivertDownstream": "SPUR_2_1"
+  },
+  {
+    "sZoneID": "C_BUF_2",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "BRANCH_3"
+  },
+  {
+    "sZoneID": "BRANCH_3",
+    "eZoneType": "branch",
+    "sTrackGroup": "main",
+    "iTargetChute": 3,
+    "sDownstream": "C_BUF_3",
+    "sDivertDownstream": "SPUR_3_1"
+  },
+  {
+    "sZoneID": "C_BUF_3",
+    "eZoneType": "transport",
+    "sTrackGroup": "main",
+    "sDownstream": "BRANCH_REJECT"
+  },
+  {
+    "sZoneID": "BRANCH_REJECT",
+    "eZoneType": "branch",
+    "sTrackGroup": "main",
+    "iTargetChute": 99,
+    "sDownstream": "C_POST_LAST",
+    "sDivertDownstream": "REJECT_1"
+  },
+  {
+    "sZoneID": "C_POST_LAST",
+    "eZoneType": "end",
+    "sTrackGroup": "main",
+    "bForceRelease": true,
+    "sDownstream": "MERGE_RECIRC"
+  },
+  {
+    "sZoneID": "MERGE_RECIRC",
+    "eZoneType": "merge",
+    "sTrackGroup": "recirc",
+    "eMergePriority": "INPUT1_PRIORITY",
+    "sDownstream": "C_RECIRC"
+  },
+  {
+    "sZoneID": "C_RECIRC",
+    "eZoneType": "transport",
+    "sTrackGroup": "recirc",
+    "bForceRelease": true,
+    "sDownstream": "MERGE_MAIN"
+  },
+  {
+    "sZoneID": "REINDUCT",
+    "eZoneType": "infeed",
+    "sTrackGroup": "reinduct",
+    "bIsSpawnPoint": true,
+    "sDownstream": "C_RI_1"
+  },
+  {
+    "sZoneID": "C_RI_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "reinduct",
+    "bForceRelease": true,
+    "sDownstream": "MERGE_RECIRC"
+  },
+  {
+    "sZoneID": "SPUR_1_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_1",
+    "sDownstream": "SPUR_1_2"
+  },
+  {
+    "sZoneID": "SPUR_1_2",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_1",
+    "sDownstream": "SPUR_1_3"
+  },
+  {
+    "sZoneID": "SPUR_1_3",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_1",
+    "bIsPickupPoint": true
+  },
+  {
+    "sZoneID": "SPUR_2_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_2",
+    "sDownstream": "SPUR_2_2"
+  },
+  {
+    "sZoneID": "SPUR_2_2",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_2",
+    "sDownstream": "SPUR_2_3"
+  },
+  {
+    "sZoneID": "SPUR_2_3",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_2",
+    "bIsPickupPoint": true
+  },
+  {
+    "sZoneID": "SPUR_3_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_3",
+    "sDownstream": "SPUR_3_2"
+  },
+  {
+    "sZoneID": "SPUR_3_2",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_3",
+    "sDownstream": "SPUR_3_3"
+  },
+  {
+    "sZoneID": "SPUR_3_3",
+    "eZoneType": "transport",
+    "sTrackGroup": "spur_3",
+    "bIsPickupPoint": true
+  },
+  {
+    "sZoneID": "REJECT_1",
+    "eZoneType": "transport",
+    "sTrackGroup": "reject",
+    "sDownstream": "REJECT_2"
+  },
+  {
+    "sZoneID": "REJECT_2",
+    "eZoneType": "transport",
+    "sTrackGroup": "reject",
+    "sDownstream": "REJECT_3"
+  },
+  {
+    "sZoneID": "REJECT_3",
+    "eZoneType": "transport",
+    "sTrackGroup": "reject",
+    "sDownstream": "REJECT_4"
+  },
+  {
+    "sZoneID": "REJECT_4",
+    "eZoneType": "transport",
+    "sTrackGroup": "reject",
+    "sDownstream": "REJECT_5"
+  },
+  {
+    "sZoneID": "REJECT_5",
+    "eZoneType": "transport",
+    "sTrackGroup": "reject",
+    "bIsPickupPoint": true
+  }
+]
