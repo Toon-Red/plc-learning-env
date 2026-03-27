@@ -837,6 +837,41 @@ select {
     padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
 }
 .gp-btns button { font-size: 10px; padding: 5px 8px; width: 100%; }
+
+/* ── UPDATE BANNER ───────────────────────────────────────────────── */
+.update-banner {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 16px; font-size: 0.85rem; border-radius: 6px;
+    margin: 4px 16px;
+}
+.update-banner.available { background: #1a2a3a; border: 1px solid #2a4a6a; color: #88bbff; }
+.update-banner.staged { background: #1a3a1a; border: 1px solid #2a5a2a; color: #4ade80; }
+.update-banner.downloading { background: #2a2a1a; border: 1px solid #4a4a2a; color: #fbbf24; }
+.update-banner.error { background: #3a1a1a; border: 1px solid #5a2a2a; color: #f87171; }
+.update-banner button {
+    padding: 4px 12px; border-radius: 4px; border: 1px solid currentColor;
+    background: transparent; color: inherit; cursor: pointer; font-size: 0.78rem;
+    font-weight: 600;
+}
+.update-banner button:hover { background: rgba(255,255,255,0.1); }
+.update-banner strong { font-weight: 700; }
+.update-banner.available, .update-banner.downloading { cursor: pointer; }
+.update-banner.available:hover { background: #1a3050; }
+.update-banner.downloading:hover { background: #3a3a20; }
+.update-action { font-size: 0.72rem; color: rgba(255,255,255,0.4); margin-left: auto; }
+.update-cancel {
+    font-size: 0.9rem; color: rgba(255,255,255,0.3); margin-left: 8px;
+    opacity: 0; transition: opacity 0.15s;
+}
+.update-banner.downloading:hover .update-cancel { opacity: 1; color: #f87171; }
+.update-progress-bar {
+    flex: 1; max-width: 300px; height: 6px;
+    background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;
+}
+.update-progress-fill {
+    height: 100%; background: #fbbf24; border-radius: 3px;
+    transition: width 0.5s ease;
+}
 </style>
 </head>
 <body>
@@ -1139,6 +1174,7 @@ async function init() {
         buildLayout();
         buildPickupToggles();
         connectWS();
+        checkForAppUpdate();
     } catch (e) {
         document.getElementById('conveyorArea').innerHTML =
             '<div style="color:var(--red); padding:20px;">Failed to connect to PLC server. Is it running?</div>';
@@ -3880,6 +3916,90 @@ function gbFeedback(msg, level) {
     if (fb) {
         fb.textContent = msg;
         fb.className = 'builder-feedback ' + (level || 'info');
+    }
+}
+
+// ── Self-Update ──────────────────────────────────────────────────────
+let _updatePoll = null;
+
+async function checkForAppUpdate() {
+    try {
+        const r = await fetch('/api/update/check');
+        const data = await r.json();
+        const el = document.getElementById('update-banner');
+        if (!el) return;
+
+        if (data.staged) {
+            showUpdateStaged(el, data.staged_version);
+        } else if (data.update_available) {
+            showUpdateAvailable(el, data.latest_version, data.release_name);
+        } else {
+            el.style.display = 'none';
+        }
+    } catch(e) {}
+}
+
+function showUpdateAvailable(el, version, name) {
+    el.style.display = 'block';
+    el.innerHTML = `<div class="update-banner available" onclick="downloadAppUpdate()" title="Click to download">
+        <span>Update available: <strong>v${esc(version)}</strong>${name ? ' — ' + esc(name) : ''}</span>
+        <span class="update-action">Click to download</span>
+    </div>`;
+}
+
+function showUpdateStaged(el, version) {
+    el.style.display = 'block';
+    el.innerHTML = `<div class="update-banner staged">
+        <span>Update ready: <strong>v${esc(version)}</strong> — close and reopen to apply</span>
+        <button onclick="event.stopPropagation();applyAppUpdate()">Restart Now</button>
+    </div>`;
+}
+
+async function downloadAppUpdate() {
+    const el = document.getElementById('update-banner');
+    el.innerHTML = `<div class="update-banner downloading" title="Downloading...">
+        <span>Starting download...</span>
+    </div>`;
+    el.style.display = 'block';
+
+    const r = await fetch('/api/update/download', {method: 'POST'});
+    const data = await r.json();
+    if (!data.ok) {
+        el.innerHTML = `<div class="update-banner error"><span>Download failed: ${esc(data.error)}</span></div>`;
+        setTimeout(() => checkForAppUpdate(), 3000);
+        return;
+    }
+
+    _updatePoll = setInterval(async () => {
+        const sr = await fetch('/api/update/status');
+        const sd = await sr.json();
+        if (sd.downloading) {
+            const pct = sd.progress || 0;
+            const mb = sd.received_mb ? `${sd.received_mb}/${sd.total_mb} MB` : '';
+            el.innerHTML = `<div class="update-banner downloading">
+                <span>Downloading... ${pct}% ${mb}</span>
+                <div class="update-progress-bar"><div class="update-progress-fill" style="width:${pct}%"></div></div>
+            </div>`;
+        } else if (sd.staged) {
+            clearInterval(_updatePoll); _updatePoll = null;
+            showUpdateStaged(el, sd.staged_version);
+        } else if (sd.error) {
+            clearInterval(_updatePoll); _updatePoll = null;
+            el.innerHTML = `<div class="update-banner error"><span>Download failed: ${esc(sd.error)}</span></div>`;
+            setTimeout(() => checkForAppUpdate(), 3000);
+        }
+    }, 1000);
+}
+
+async function applyAppUpdate() {
+    const r = await fetch('/api/update/apply', {method: 'POST'});
+    const data = await r.json();
+    if (data.ok) {
+        document.getElementById('update-banner').innerHTML =
+            `<div class="update-banner staged"><span>Restarting...</span></div>`;
+    } else {
+        document.getElementById('update-banner').innerHTML =
+            `<div class="update-banner staged"><span>Update staged. Close this window and relaunch to apply.</span></div>`;
     }
 }
 
