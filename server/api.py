@@ -135,6 +135,15 @@ app = FastAPI(
 )
 
 
+# ── Health / Version ─────────────────────────────────────────────────────────
+
+@app.get("/api/health")
+def health():
+    """Health check with version info."""
+    from version import __version__, DEV_MODE
+    return {"status": "ok", "version": __version__, "dev_mode": DEV_MODE}
+
+
 # ── REST Endpoints ───────────────────────────────────────────────────────────
 
 @app.get("/api/topology")
@@ -646,6 +655,71 @@ def topology_from_template(body: dict):
         }
 
     return JSONResponse(status_code=400, content={"error": f"Unknown template: {template_name}"})
+
+
+# ── Self-Update (GitHub Releases) ────────────────────────────────────────────
+
+@app.get("/api/update/check")
+def check_update():
+    """Check GitHub for a newer release."""
+    from updater import get_latest_release, is_newer, get_current_version, is_update_staged, get_staged_version
+    current = get_current_version()
+    result = get_latest_release()
+    staged = is_update_staged()
+    staged_ver = get_staged_version() if staged else None
+    resp = {
+        "current_version": current,
+        "update_available": False,
+        "staged": staged,
+        "staged_version": staged_ver,
+    }
+    if result and is_newer(result["version"], current):
+        resp["update_available"] = True
+        resp["latest_version"] = result["version"]
+        resp["release_name"] = result["name"]
+        resp["release_notes"] = result["notes"]
+        resp["exe_url"] = result["exe_url"]
+    return resp
+
+
+@app.get("/api/releases")
+def list_releases():
+    """List recent GitHub releases."""
+    from updater import get_all_releases
+    return {"releases": get_all_releases(limit=10)}
+
+
+@app.post("/api/update/download")
+def download_update_endpoint():
+    """Start downloading the latest release exe."""
+    from updater import get_latest_release, is_newer, get_current_version, update_manager
+    release = get_latest_release()
+    if not release or not is_newer(release["version"], get_current_version()):
+        return {"ok": False, "error": "No update available"}
+    if not release.get("exe_url"):
+        return {"ok": False, "error": "No exe asset in release"}
+    started = update_manager.start_download(release["exe_url"], release["version"])
+    return {"ok": started}
+
+
+@app.get("/api/update/status")
+def update_status():
+    """Get download progress."""
+    from updater import update_manager
+    return update_manager.get_status()
+
+
+@app.post("/api/update/apply")
+def apply_update():
+    """Apply staged update and restart (frozen exe only)."""
+    import sys as _sys
+    from updater import apply_update_and_restart, is_update_staged
+    if not is_update_staged():
+        return {"ok": False, "error": "No staged update"}
+    if not getattr(_sys, "frozen", False):
+        return {"ok": False, "error": "Running from source — close and relaunch to apply"}
+    apply_update_and_restart()
+    return {"ok": True}  # won't reach here — os._exit(0) fires first
 
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
