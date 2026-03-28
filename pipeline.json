@@ -1,0 +1,9 @@
+{
+  "name": "PLC Learning Environment",
+  "app_id": "PLCLearningEnv.1.0",
+  "template_type": "desktop_app",
+  "port": 8080,
+  "exe_name": "PLCLearningEnv.exe",
+  "install_dir": "%LOCALAPPDATA%/PLCLearningEnv",
+  "health_endpoint": "/api/health"
+}
