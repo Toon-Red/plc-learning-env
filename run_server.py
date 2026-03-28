@@ -25,11 +25,13 @@ def main():
     print(f"Starting PLC Conveyor Sortation Server on http://{args.host}:{args.port}")
     print("Press Ctrl+C to stop.")
 
+    import sys
+    from server.api import app
     uvicorn.run(
-        "server.api:app",
+        app,
         host=args.host,
         port=args.port,
-        reload=args.reload,
+        reload=args.reload and not getattr(sys, 'frozen', False),
         log_level="info",
     )
 
