@@ -1,0 +1,44 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r requirements.txt pyinstaller
+      - name: Set version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          printf '__version__ = "%s"\nDEV_MODE = False\n' "$VERSION" > version.py
+      - name: Build exe
+        run: pyinstaller --onefile --name PLCLearningEnv --add-data "hmi;hmi" --add-data "plc;plc" --add-data "server;server" run_server.py
+      - name: Smoke test
+        shell: bash
+        run: |
+          ./dist/PLCLearningEnv.exe &
+          EXE_PID=$!
+          for i in $(seq 1 60); do
+            if ! kill -0 $EXE_PID 2>/dev/null; then echo "FAIL: died"; exit 1; fi
+            RESP=$(curl -s http://127.0.0.1:8080/api/health 2>/dev/null || true)
+            if echo "$RESP" | grep -q '"status":"ok"'; then
+              echo "OK: $RESP"; kill $EXE_PID 2>/dev/null; exit 0
+            fi
+            sleep 1
+          done
+          echo "FAIL: no response"; kill $EXE_PID 2>/dev/null; exit 1
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/PLCLearningEnv.exe
+          generate_release_notes: true

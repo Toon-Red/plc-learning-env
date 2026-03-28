@@ -1,0 +1,46 @@
+name: Dev Build
+
+on:
+  push:
+    branches-ignore: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r requirements.txt pytest httpx
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r requirements.txt pyinstaller
+      - name: Set dev version
+        shell: bash
+        run: |
+          SHORT_SHA=$(echo "$GITHUB_SHA" | head -c 7)
+          BRANCH=$(echo "$GITHUB_REF_NAME" | sed 's/[^a-zA-Z0-9_-]/-/g')
+          printf '__version__ = "0.0.0-dev+%s.%s"\nDEV_MODE = True\n' "$BRANCH" "$SHORT_SHA" > version.py
+      - name: Build exe
+        run: pyinstaller --onefile --name PLCLearningEnv --add-data "hmi;hmi" --add-data "plc;plc" --add-data "server;server" run_server.py
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLCLearningEnv-dev-${{ github.ref_name }}-${{ github.sha }}
+          path: dist/PLCLearningEnv.exe
+          retention-days: 14
