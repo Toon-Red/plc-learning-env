@@ -23,4 +23,11 @@ jobs:
       - name: Verify imports
         run: python -c "from version import __version__; print(f'v{__version__} imports OK')"
       - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          retention-days: 7
