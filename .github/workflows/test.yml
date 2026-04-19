@@ -3,8 +3,28 @@ name: Tests
 on:
   push:
     branches: [master]
+    paths:
+      - '**.py'
+      - '**.js'
+      - '**.html'
+      - '**.css'
+      - 'requirements.txt'
+      - 'build.spec'
+      - 'pipeline.json'
+      - 'version_info.txt'
+      - '.github/workflows/**'
   pull_request:
     branches: [master]
+    paths:
+      - '**.py'
+      - '**.js'
+      - '**.html'
+      - '**.css'
+      - 'requirements.txt'
+      - 'build.spec'
+      - 'pipeline.json'
+      - 'version_info.txt'
+      - '.github/workflows/**'
 
 permissions:
   contents: read

@@ -3,9 +3,23 @@ name: Dev Build
 on:
   push:
     branches-ignore: [master]
+    paths:
+      - '**.py'
+      - '**.js'
+      - '**.html'
+      - '**.css'
+      - 'requirements.txt'
+      - 'build.spec'
+      - 'pipeline.json'
+      - 'version_info.txt'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
